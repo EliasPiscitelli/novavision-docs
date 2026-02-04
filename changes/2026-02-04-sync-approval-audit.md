@@ -541,49 +541,54 @@ WHERE chs.id IS NULL AND c.publication_status = 'published';
 
 ---
 
-# ✅ EXECUTION CHECKLIST (SIN EJECUTAR AÚN)
+# ✅ EXECUTION CHECKLIST
 
-> **Estado:** Pendiente de aprobación del plan
+> **Estado:** EN PROGRESO - Fases 0-3 completadas
 
 ## Pre-Ejecución
-- [ ] Revisar y aprobar este informe
-- [ ] Confirmar decisión: `client_home_settings` como fuente única
-- [ ] Crear rama: `fix/theme-source-of-truth`
+- [x] Revisar y aprobar este informe
+- [x] Confirmar decisión: `client_home_settings` como fuente única
+- [x] Trabajando en rama: `develop`
 - [ ] Backup de DB de producción (si aplica)
 
-## Fase 0 (Docs)
-- [ ] Crear `novavision-docs/architecture/config-source-of-truth.md`
-- [ ] Actualizar README de `apps/api/src/home/`
-- [ ] Commit: `docs: define client_home_settings as single source of truth`
+## Fase 0 (Docs) ✅ COMPLETADA
+- [x] Crear `novavision-docs/architecture/config-source-of-truth.md`
+- [x] Actualizar README de `apps/api/src/home/`
+- [x] Commit: `docs: define client_home_settings as single source of truth`
 
-## Fase 1 (DB Client Fix)
-- [ ] Modificar `home-settings.service.ts`: cambiar a `SUPABASE_CLIENT`
-- [ ] Agregar logs de warning en fallback
-- [ ] `npm run typecheck && npm run lint`
-- [ ] Test unitario
-- [ ] Commit: `fix(api): use backend client in HomeSettingsService`
+## Fase 1 (Error Handling) ✅ COMPLETADA
+- [x] **CORRECCIÓN**: No cambiar DB client - el problema era error handling silencioso
+- [x] Agregar captura de error en upsert (línea 1022)
+- [x] Agregar logs de success/failure
+- [x] `npm run typecheck && npm run lint` ✓
+- [x] Commit: `fix(api): add error handling to client_home_settings upsert in provisioning`
 
-## Fase 2 (Provisioning)
-- [ ] Agregar logs al upsert de `client_home_settings`
-- [ ] Agregar validación de resultado
-- [ ] Test de integración
-- [ ] Commit: `fix(api): ensure provisioning writes to client_home_settings`
+## Fase 2 (Provisioning Logs) ✅ COMPLETADA
+- [x] El primer flujo (línea 608) ya tiene error handling
+- [x] Hacer theme_config condicional (columna puede no existir)
+- [x] Commit: `fix(api): make theme_config optional in provisioning + add backfill scripts`
 
-## Fase 3 (Backfill)
-- [ ] Crear script `backfill-home-settings.ts`
-- [ ] Ejecutar en dry-run
-- [ ] Revisar output
-- [ ] Ejecutar en modo real
-- [ ] Verificar query de huérfanos = 0
-- [ ] Commit: `chore(migrations): backfill client_home_settings`
+## Fase 3 (Backfill) ✅ COMPLETADA
+- [x] Crear script `scripts/backfill-home-settings.ts`
+- [x] Ejecutar en dry-run - encontró 1 cliente (demo-store)
+- [x] Ejecutar en modo real - insertó 1 row
+- [x] Verificar: `client_home_settings` ahora tiene datos
+- [x] Crear migración `20260204000001_add_theme_config_to_home_settings.sql`
 
-## Fase 4 (Preview)
+## Migración Pendiente ⚠️
+- [ ] **ACCIÓN REQUERIDA**: Ejecutar en Supabase Dashboard:
+  ```sql
+  ALTER TABLE client_home_settings
+  ADD COLUMN IF NOT EXISTS theme_config JSONB DEFAULT '{}';
+  ```
+
+## Fase 4 (Preview) - PENDIENTE
 - [ ] Implementar `preview_token` en storefront controller
 - [ ] Actualizar Admin preview component
 - [ ] Test visual preview vs producción
 - [ ] Commit: `feat(api): add preview token for draft stores`
 
-## Fase 5 (Guardrails)
+## Fase 5 (Guardrails) - PENDIENTE
 - [ ] Implementar health check `/health/config`
 - [ ] Agregar validación pre-publicación
 - [ ] Crear runbook
