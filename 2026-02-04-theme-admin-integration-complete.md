@@ -54,9 +54,10 @@
 - `/apps/admin/src/services/themeResolver/useEffectiveTheme.ts`
 - `/apps/admin/src/services/themeResolver/index.ts`
 
-**Admin Controls:**
-- `/apps/admin/src/components/ThemePreviewControls/ThemePreviewControls.tsx`
-- `/apps/admin/src/components/ThemePreviewControls/index.ts`
+**Note:**
+- Resolver copied for future use in `PreviewFrame` if needed
+- Removed: ThemePreviewControls (unnecessary for super admin dashboard)
+- Admin consumes themes from API/BD, not from UI selection
 
 ---
 
@@ -116,25 +117,16 @@ function App() {
 
 ### En Admin Preview
 
+### En Admin Preview
+
+**Nota**: El resolver está disponible en `services/themeResolver/` para uso futuro en `PreviewFrame` si es necesario.
+El dashboard de super admin NO necesita UI de selección de temas (los temas vienen de la API/BD).
+
 ```jsx
-import { ThemePreviewControls } from './components/ThemePreviewControls';
+// Resolver disponible para usar si PreviewFrame lo requiere en futuro
+import { useEffectiveTheme, resolveEffectiveTheme } from './services/themeResolver';
 
-function OnboardingPage() {
-  const [currentTheme, setCurrentTheme] = useState(null);
-
-  return (
-    <>
-      <ThemePreviewControls 
-        onThemeChange={setCurrentTheme}
-        initialTemplate="first"
-        initialPalette="starter_default"
-      />
-      <PreviewFrame 
-        payload={{ templateKey: currentTheme?.templateKey, ... }}
-      />
-    </>
-  );
-}
+// Consume temas desde API/BD, no desde UI
 ```
 
 ---
@@ -145,7 +137,7 @@ function OnboardingPage() {
 
 - [x] **Resolver unificado creado** (single source of truth)
 - [x] **Web storefront integrado** (App.jsx usando resolver)
-- [x] **Admin preview integrado** (ThemePreviewControls)
+- [x] **Admin resolver añadido** (disponible para PreviewFrame, sin UI innecesaria)
 - [x] **Debug panel funcionando** (🎨 button, WCAG contrast check)
 - [x] **Sin breaking changes** (100% backward compatible)
 - [x] **TypeScript validation**: 0 errors
