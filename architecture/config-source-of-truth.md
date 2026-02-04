@@ -142,24 +142,30 @@ this.logger.log(`Upserted client_home_settings for client ${clientId}`);
 **Archivo:** `apps/api/src/home/home-settings.service.ts`
 
 **Responsabilidad:**
-- Leer de `client_home_settings` usando **Backend DB client** (no Admin)
+- Leer de `client_home_settings` (Backend DB)
+- Recibir el cliente de DB correcto vía parámetro `cli`
 - Si no hay row, loggear WARNING y usar defaults
 - Normalizar snake_case → camelCase para el frontend
+
+**Importante:** El servicio tiene `SUPABASE_ADMIN_CLIENT` como default (para operaciones de admin), 
+pero los callers del storefront (HomeService, StorefrontAssembler) DEBEN pasar el Backend client 
+como parámetro `cli`.
 
 **Código de referencia:**
 ```typescript
 // home-settings.service.ts
 async getSettings(clientId: string, cli?: SupabaseClient): Promise<HomeSettings> {
-  const client = cli || this.supabaseClient; // DEBE ser Backend client
+  // cli debe ser el Backend client cuando se llama desde storefront
+  const db = cli ?? this.supabase;
   
-  const { data, error } = await client
+  const { data, error } = await db
     .from('client_home_settings')
     .select('template_key, palette_key, identity_config, theme_config')
     .eq('client_id', clientId)
-    .single();
+    .maybeSingle();
 
   if (error || !data) {
-    this.logger.warn(`Using default settings for client ${clientId}`);
+    console.warn(`Using default settings for client ${clientId}`);
     return {
       templateKey: 'first',
       paletteKey: 'starter_default',
@@ -183,10 +189,10 @@ async getSettings(clientId: string, cli?: SupabaseClient): Promise<HomeSettings>
 
 ### ✅ DEBE cumplirse
 
-1. **Una sola fuente:** El storefront SOLO lee de `client_home_settings`
-2. **Provisioning completo:** Al publicar, SIEMPRE escribir a `client_home_settings`
+1. **Una sola fuente:** El storefront SOLO lee de `client_home_settings` (Backend DB)
+2. **Provisioning completo:** Al publicar, SIEMPRE escribir a `client_home_settings` con verificación de errores
 3. **Logs obligatorios:** Todo fallback debe loggear WARNING
-4. **Backend DB:** HomeSettingsService usa `SUPABASE_CLIENT`, no `SUPABASE_ADMIN_CLIENT`
+4. **Callers correctos:** Los servicios de storefront deben pasar el Backend client como `cli`
 
 ### ❌ PROHIBIDO
 
@@ -194,6 +200,7 @@ async getSettings(clientId: string, cli?: SupabaseClient): Promise<HomeSettings>
 2. Leer config de storefront desde `nv_onboarding` directamente
 3. Publicar una tienda sin row en `client_home_settings`
 4. Fallbacks silenciosos sin logging
+5. Upserts sin verificación de errores (ignorar el `error` de Supabase)
 
 ---
 
