@@ -47,4 +47,32 @@ Las reglas en `rules/` son inmutables y deben respetarse en todo cambio:
 
 ---
 
-*Última actualización: 2026-02-03*
+## 🔥 Tópicos Destacados (Active)
+
+### [🎨 Theme System Refactor - 2026-02-04](./THEME_QUICK_REFERENCE.md)
+**Status**: ✅ **COMPLETE** - Unified theme resolver para storefront + admin
+
+**Quick Start**:
+- **One Page**: [THEME_QUICK_REFERENCE.md](./THEME_QUICK_REFERENCE.md) (5 min read)
+- **Full Summary**: [THEME_FINAL_SUMMARY.md](./THEME_FINAL_SUMMARY.md) (10 min read)
+- **Validation**: [THEME_VALIDATION_MANUAL.md](./THEME_VALIDATION_MANUAL.md) (20 min checklist)
+- **Admin Integration**: [THEME_ADMIN_INTEGRATION.md](./THEME_ADMIN_INTEGRATION.md) (Phase 6)
+- **All Docs**: [THEME_DOCUMENTATION_INDEX.md](./THEME_DOCUMENTATION_INDEX.md)
+
+**What Changed**:
+- ✅ Created `resolveEffectiveTheme.ts` - unified resolver
+- ✅ Created `useEffectiveTheme.ts` - React hook wrapper
+- ✅ Created `ThemeDebugPanel.jsx` - visual debug tool (🎨 button)
+- ✅ Integrated in `App.jsx` - uses API config now
+- ✅ Zero breaking changes, fully backward compatible
+
+**Files**:
+- `/apps/web/src/theme/resolveEffectiveTheme.ts` (400+ lines)
+- `/apps/web/src/hooks/useEffectiveTheme.ts` (40 lines)
+- `/apps/web/src/components/ThemeDebugPanel/ThemeDebugPanel.jsx` (400+ lines)
+- `/apps/web/src/App.jsx` (updated)
+
+---
+
+*Última actualización: 2026-02-04*
+

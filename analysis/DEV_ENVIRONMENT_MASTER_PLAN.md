@@ -374,6 +374,34 @@ function attemptCorrections(data: any, error: any) {
 
 ## 🎨 Dev Portal
 
+### ¿Qué es el Develop Panel (Dev Portal)?
+
+El **Develop Panel** (Dev Portal) es el **panel interno de desarrollo** para diseñar, validar y estandarizar templates, componentes y data del storefront sin tocar producción. Funciona como un **playground controlado** y un **centro de validación** para evitar regresiones, asegurar multi‑tenant y acelerar la iteración con IA.
+
+**Para qué sirve**
+
+- Centraliza la **documentación viva** de templates, componentes y schemas.
+- Permite **previsualizar** templates y componentes con data demo o data real controlada.
+- Integra **auditorías automáticas** (multi‑tenant, seguridad, estilos, performance).
+- Provee **staging de código** antes de commitear (control de calidad).
+- Estándariza **prompts y generación de código** con IA.
+
+**Dónde vive y cuándo se usa**
+
+- Ruta: **/__dev** (solo en entorno DEV).
+- Alcance: solo equipo interno (no expuesto a clientes).
+- Objetivo: acelerar QA técnico y reducir errores en cambios de UI/UX.
+
+**Qué incluye (módulos principales)**
+
+- **Index / Quick Start:** guía operativa, pasos y checklists.
+- **Templates:** preview de templates y selección de base.
+- **Componentes:** playground con data editable y vista responsive.
+- **Prompts IA:** librería de prompts y outputs esperados.
+- **Staging:** revisión y validación previa a commit.
+- **Auditoría:** resultados de validación automática.
+- **Schemas:** documentación de Zod schemas y validadores.
+
 ### Página Index (Guía Principal)
 
 ```jsx
