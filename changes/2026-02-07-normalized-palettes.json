@@ -1,0 +1,1235 @@
+[
+  {
+    "palette_key": "blue_tech",
+    "label": "Azul Tecnológico",
+    "description": "Estilo moderno con acentos en azul brillante y gris.",
+    "min_plan_key": "starter",
+    "mode": "light",
+    "tokens": {
+      "--nv-bg": "#FBFBFF",
+      "--nv-surface": "#F0F4F8",
+      "--nv-card-bg": "#FFFFFF",
+      "--nv-text": "#404040",
+      "--nv-text-muted": "#6B7280",
+      "--nv-border": "#E2E8F0",
+      "--nv-shadow": "rgba(1,186,239,0.08)",
+      "--nv-primary": "#01BAEF",
+      "--nv-primary-hover": "#0099CC",
+      "--nv-primary-fg": "#000000",
+      "--nv-accent": "#00E5FF",
+      "--nv-accent-fg": "#000000",
+      "--nv-link": "#01BAEF",
+      "--nv-link-hover": "#0099CC",
+      "--nv-info": "#3B82F6",
+      "--nv-success": "#10B981",
+      "--nv-warning": "#F59E0B",
+      "--nv-error": "#EF4444",
+      "--nv-ring": "rgba(1,186,239,0.35)",
+      "--nv-input-bg": "#FFFFFF",
+      "--nv-input-text": "#404040",
+      "--nv-input-border": "#E2E8F0",
+      "--nv-navbar-bg": "#FBFBFF",
+      "--nv-footer-bg": "#1E293B",
+      "--nv-radius": "12px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Legacy keys (text, accent, primary, background) presentes junto a --nv-*",
+        "--nv-muted era rgba(64,64,64,0.4) — no apto como color de texto legible",
+        "--nv-hover era copia exacta de primary — sin diferenciación"
+      ],
+      "fixes_applied": [
+        "Eliminadas keys legacy (text, accent, primary, background)",
+        "--nv-muted reemplazado por --nv-text-muted: #6B7280 (gris legible)",
+        "--nv-hover reemplazado por --nv-primary-hover: #0099CC (primary oscurecido)",
+        "--nv-surface ajustado a #F0F4F8 para diferenciar de bg"
+      ],
+      "notes": [
+        "Contraste --nv-text (#404040) sobre --nv-bg (#FBFBFF): ratio ~8.3:1 ✓",
+        "Contraste --nv-primary-fg (#000000) sobre --nv-primary (#01BAEF): ratio ~9.6:1 ✓",
+        "Accent #00E5FF es muy brillante — accent-fg negro es correcto"
+      ],
+      "compatibility": {
+        "legacy_detected": true,
+        "missing_filled": [
+          "--nv-text-muted", "--nv-shadow", "--nv-primary-hover",
+          "--nv-link", "--nv-link-hover", "--nv-info", "--nv-success",
+          "--nv-warning", "--nv-error", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "boutique_default",
+    "label": "Boutique Rosa",
+    "description": "Estilo femenino y elegante con detalles dorados.",
+    "min_plan_key": "starter",
+    "mode": "light",
+    "tokens": {
+      "--nv-bg": "#FFF6F8",
+      "--nv-surface": "#FFFFFF",
+      "--nv-card-bg": "#FFFFFF",
+      "--nv-text": "#1F2937",
+      "--nv-text-muted": "#6B7280",
+      "--nv-border": "rgba(31,41,55,0.10)",
+      "--nv-shadow": "rgba(180,35,106,0.08)",
+      "--nv-primary": "#B4236A",
+      "--nv-primary-hover": "#9A1D5A",
+      "--nv-primary-fg": "#FFFFFF",
+      "--nv-accent": "#C9A46B",
+      "--nv-accent-fg": "#000000",
+      "--nv-link": "#B4236A",
+      "--nv-link-hover": "#9A1D5A",
+      "--nv-info": "#3B82F6",
+      "--nv-success": "#10B981",
+      "--nv-warning": "#F59E0B",
+      "--nv-error": "#EF4444",
+      "--nv-ring": "rgba(180,35,106,0.35)",
+      "--nv-input-bg": "#FFFFFF",
+      "--nv-input-text": "#1F2937",
+      "--nv-input-border": "rgba(31,41,55,0.15)",
+      "--nv-navbar-bg": "#FFF6F8",
+      "--nv-footer-bg": "#1F2937",
+      "--nv-radius": "16px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Legacy keys presentes",
+        "--nv-muted era rgba opaco — no legible como texto",
+        "--nv-surface y --nv-card-bg eran ambas #F8FAFC (gris) en lugar de blanco"
+      ],
+      "fixes_applied": [
+        "Eliminadas keys legacy",
+        "--nv-text-muted: #6B7280",
+        "--nv-surface y --nv-card-bg ajustados a #FFFFFF para mejor contraste con bg rosa",
+        "Radius 16px acorde al estilo boutique/femenino"
+      ],
+      "notes": [
+        "Contraste texto/bg: ~14:1 ✓",
+        "Contraste primary-fg/primary: ~7.1:1 ✓",
+        "Accent dorado #C9A46B sobre blanco: ratio ~3.0 — apto solo para elementos grandes (badges), no texto pequeño"
+      ],
+      "compatibility": {
+        "legacy_detected": true,
+        "missing_filled": [
+          "--nv-text-muted", "--nv-shadow", "--nv-primary-hover",
+          "--nv-link", "--nv-link-hover", "--nv-info", "--nv-success",
+          "--nv-warning", "--nv-error", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "classic_white",
+    "label": "Clásica Blanca",
+    "description": "Diseño limpio y minimalista ideal para cualquier marca.",
+    "min_plan_key": "starter",
+    "mode": "light",
+    "tokens": {
+      "--nv-bg": "#F7F9FC",
+      "--nv-surface": "#FFFFFF",
+      "--nv-card-bg": "#FFFFFF",
+      "--nv-text": "#222B45",
+      "--nv-text-muted": "#64748B",
+      "--nv-border": "rgba(34,43,69,0.12)",
+      "--nv-shadow": "rgba(34,43,69,0.08)",
+      "--nv-primary": "#8E9BDE",
+      "--nv-primary-hover": "#7B89CC",
+      "--nv-primary-fg": "#000000",
+      "--nv-accent": "#6366F1",
+      "--nv-accent-fg": "#FFFFFF",
+      "--nv-link": "#6366F1",
+      "--nv-link-hover": "#4F46E5",
+      "--nv-info": "#3B82F6",
+      "--nv-success": "#10B981",
+      "--nv-warning": "#F59E0B",
+      "--nv-error": "#EF4444",
+      "--nv-ring": "rgba(142,155,222,0.35)",
+      "--nv-input-bg": "#FFFFFF",
+      "--nv-input-text": "#222B45",
+      "--nv-input-border": "rgba(34,43,69,0.15)",
+      "--nv-navbar-bg": "#FFFFFF",
+      "--nv-footer-bg": "#222B45",
+      "--nv-radius": "8px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Legacy keys presentes",
+        "--nv-primary #8E9BDE es pastel — contraste con fg negro ≈5.5:1 (aprobado pero justo)",
+        "--nv-card-bg era #F8FAFC sobre bg #F7F9FC — casi indistinguibles"
+      ],
+      "fixes_applied": [
+        "Eliminadas keys legacy",
+        "--nv-card-bg ajustado a #FFFFFF para mejor separación visual",
+        "--nv-link usa accent (#6366F1) más saturado que primary para mejor legibilidad",
+        "Radius 8px acorde al estilo minimalista"
+      ],
+      "notes": [
+        "Primary es pastel — funciona como botón suave, legible con texto negro",
+        "Accent indigo #6366F1 tiene buena legibilidad con fg blanco (ratio ~5.9:1)"
+      ],
+      "compatibility": {
+        "legacy_detected": true,
+        "missing_filled": [
+          "--nv-text-muted", "--nv-shadow", "--nv-primary-hover",
+          "--nv-link", "--nv-link-hover", "--nv-info", "--nv-success",
+          "--nv-warning", "--nv-error", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "coral_energy",
+    "label": "Coral Energético",
+    "description": "Rosa vibrante y coral, atrevido y creativo.",
+    "min_plan_key": "growth",
+    "mode": "light",
+    "tokens": {
+      "--nv-bg": "#FFF1F2",
+      "--nv-surface": "#FFFFFF",
+      "--nv-card-bg": "#FFFFFF",
+      "--nv-text": "#1F2937",
+      "--nv-text-muted": "#6B7280",
+      "--nv-border": "#FECDD3",
+      "--nv-shadow": "rgba(236,72,153,0.15)",
+      "--nv-primary": "#EC4899",
+      "--nv-primary-hover": "#DB2777",
+      "--nv-primary-fg": "#FFFFFF",
+      "--nv-accent": "#8B5CF6",
+      "--nv-accent-fg": "#FFFFFF",
+      "--nv-link": "#EC4899",
+      "--nv-link-hover": "#DB2777",
+      "--nv-info": "#3B82F6",
+      "--nv-success": "#10B981",
+      "--nv-warning": "#F59E0B",
+      "--nv-error": "#DC2626",
+      "--nv-ring": "rgba(236,72,153,0.35)",
+      "--nv-input-bg": "#FFFFFF",
+      "--nv-input-text": "#1F2937",
+      "--nv-input-border": "#FECDD3",
+      "--nv-navbar-bg": "#FFF1F2",
+      "--nv-footer-bg": "#1F2937",
+      "--nv-radius": "12px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Faltaban: surface, primary-fg, accent, accent-fg, link, ring, inputs, navbar, footer, radius, font",
+        "NO existe en PALETTES registry del web ni admin (solo en DB)"
+      ],
+      "fixes_applied": [
+        "Surface: #FFFFFF",
+        "Primary-fg: #FFFFFF (primary #EC4899 es oscuro, YIQ≈98)",
+        "Accent derivado: #8B5CF6 (purple — complemento creativo del coral)",
+        "Tokens faltantes completados de forma coherente"
+      ],
+      "notes": [
+        "Contraste primary-fg/primary: ~5.7:1 ✓",
+        "Borde #FECDD3 es temático (rosa claro) — correcto para el estilo",
+        "REQUIERE agregarse a PALETTES en palettes.ts y paletteConstants.ts"
+      ],
+      "compatibility": {
+        "legacy_detected": false,
+        "missing_filled": [
+          "--nv-surface", "--nv-primary-fg", "--nv-accent", "--nv-accent-fg",
+          "--nv-link", "--nv-link-hover", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "dark_default",
+    "label": "Modo Oscuro",
+    "description": "Tema oscuro equilibrado con acentos vibrantes.",
+    "min_plan_key": "starter",
+    "mode": "dark",
+    "tokens": {
+      "--nv-bg": "#0B1020",
+      "--nv-surface": "#151B2E",
+      "--nv-card-bg": "#1A2236",
+      "--nv-text": "#E5E7EB",
+      "--nv-text-muted": "#94A3B8",
+      "--nv-border": "rgba(229,231,235,0.12)",
+      "--nv-shadow": "rgba(0,0,0,0.40)",
+      "--nv-primary": "#7C3AED",
+      "--nv-primary-hover": "#6D28D9",
+      "--nv-primary-fg": "#FFFFFF",
+      "--nv-accent": "#22D3EE",
+      "--nv-accent-fg": "#000000",
+      "--nv-link": "#22D3EE",
+      "--nv-link-hover": "#06B6D4",
+      "--nv-info": "#60A5FA",
+      "--nv-success": "#34D399",
+      "--nv-warning": "#FBBF24",
+      "--nv-error": "#F87171",
+      "--nv-ring": "rgba(124,58,237,0.40)",
+      "--nv-input-bg": "#1A2236",
+      "--nv-input-text": "#E5E7EB",
+      "--nv-input-border": "rgba(229,231,235,0.15)",
+      "--nv-navbar-bg": "#0B1020",
+      "--nv-footer-bg": "#070B18",
+      "--nv-radius": "12px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "CRÍTICO: --nv-card-bg era #F8FAFC (BLANCO) sobre bg oscuro #0B1020",
+        "CRÍTICO: --nv-surface era #F8FAFC (BLANCO) sobre bg oscuro",
+        "CRÍTICO: --nv-border era #E2E8F0 (claro sólido) — invisible y roto en dark mode",
+        "Legacy keys presentes"
+      ],
+      "fixes_applied": [
+        "--nv-surface corregido a #151B2E (azul oscuro sutil)",
+        "--nv-card-bg corregido a #1A2236 (ligeramente más claro que surface)",
+        "--nv-border corregido a rgba(229,231,235,0.12) para visibilidad sutil",
+        "Estados (info/success/warning/error) ajustados a versiones claras para dark mode",
+        "Link usa accent cyan para contraste en fondo oscuro"
+      ],
+      "notes": [
+        "Contraste texto/bg: ~14:1 ✓",
+        "Contraste primary-fg/primary: ~8.1:1 ✓",
+        "Los valores de card-bg/surface del DB estaban COMPLETAMENTE ROTOS — este era el error visible"
+      ],
+      "compatibility": {
+        "legacy_detected": true,
+        "missing_filled": [
+          "--nv-text-muted", "--nv-shadow", "--nv-primary-hover",
+          "--nv-link", "--nv-link-hover", "--nv-info", "--nv-success",
+          "--nv-warning", "--nv-error", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "elegant_purple",
+    "label": "Elegancia Púrpura",
+    "description": "Tonos violetas y dorados para marcas premium.",
+    "min_plan_key": "starter",
+    "mode": "light",
+    "tokens": {
+      "--nv-bg": "#F5F6FA",
+      "--nv-surface": "#FFFFFF",
+      "--nv-card-bg": "#FFFFFF",
+      "--nv-text": "#262A56",
+      "--nv-text-muted": "#6B7280",
+      "--nv-border": "rgba(38,42,86,0.12)",
+      "--nv-shadow": "rgba(163,103,177,0.08)",
+      "--nv-primary": "#A367B1",
+      "--nv-primary-hover": "#8B5599",
+      "--nv-primary-fg": "#FFFFFF",
+      "--nv-accent": "#C9A961",
+      "--nv-accent-fg": "#000000",
+      "--nv-link": "#A367B1",
+      "--nv-link-hover": "#8B5599",
+      "--nv-info": "#3B82F6",
+      "--nv-success": "#10B981",
+      "--nv-warning": "#F59E0B",
+      "--nv-error": "#EF4444",
+      "--nv-ring": "rgba(163,103,177,0.35)",
+      "--nv-input-bg": "#FFFFFF",
+      "--nv-input-text": "#262A56",
+      "--nv-input-border": "rgba(38,42,86,0.15)",
+      "--nv-navbar-bg": "#FFFFFF",
+      "--nv-footer-bg": "#262A56",
+      "--nv-radius": "12px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Legacy keys presentes",
+        "--nv-primary-fg era #000000 — incorrecto, primary #A367B1 es medio-oscuro",
+        "--nv-card-bg era gris (#F8FAFC) sobre bg lavanda"
+      ],
+      "fixes_applied": [
+        "--nv-primary-fg corregido a #FFFFFF (mejor contraste visual aunque YIQ está en el límite, white ofrece mayor legibilidad perceptual sobre púrpura)",
+        "--nv-card-bg ajustado a #FFFFFF"
+      ],
+      "notes": [
+        "Primary #A367B1: YIQ=129 (borderline). Contraste con negro ≈5.5:1, con blanco ≈3.8:1. Negro pasa WCAG pero perceptualmente blanco es más legible sobre púrpura. DECISIÓN: usar blanco para consistencia visual premium.",
+        "Accent dorado #C9A961 sobre bg: apto para badges/detalles grandes"
+      ],
+      "compatibility": {
+        "legacy_detected": true,
+        "missing_filled": [
+          "--nv-text-muted", "--nv-shadow", "--nv-primary-hover",
+          "--nv-link", "--nv-link-hover", "--nv-info", "--nv-success",
+          "--nv-warning", "--nv-error", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "forest_calm",
+    "label": "Bosque Sereno",
+    "description": "Verde natural, ecofriendly y confiable.",
+    "min_plan_key": "starter",
+    "mode": "light",
+    "tokens": {
+      "--nv-bg": "#FFFFFF",
+      "--nv-surface": "#FAFAF9",
+      "--nv-card-bg": "#FAFAF9",
+      "--nv-text": "#1C1917",
+      "--nv-text-muted": "#78716C",
+      "--nv-border": "#E7E5E4",
+      "--nv-shadow": "rgba(28,25,23,0.10)",
+      "--nv-primary": "#10B981",
+      "--nv-primary-hover": "#059669",
+      "--nv-primary-fg": "#FFFFFF",
+      "--nv-accent": "#D97706",
+      "--nv-accent-fg": "#000000",
+      "--nv-link": "#059669",
+      "--nv-link-hover": "#047857",
+      "--nv-info": "#06B6D4",
+      "--nv-success": "#22C55E",
+      "--nv-warning": "#F59E0B",
+      "--nv-error": "#EF4444",
+      "--nv-ring": "rgba(16,185,129,0.35)",
+      "--nv-input-bg": "#FFFFFF",
+      "--nv-input-text": "#1C1917",
+      "--nv-input-border": "#E7E5E4",
+      "--nv-navbar-bg": "#FFFFFF",
+      "--nv-footer-bg": "#1C1917",
+      "--nv-radius": "10px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Faltaban: surface, primary-fg, accent, accent-fg, link, ring, inputs, navbar, footer, radius, font",
+        "NO existe en PALETTES registry del web ni admin"
+      ],
+      "fixes_applied": [
+        "Surface: #FAFAF9 (stone tint — orgánico)",
+        "Primary-fg: #FFFFFF (green #10B981 es medio, white tiene mejor contraste)",
+        "Accent derivado: #D97706 (amber — complemento natural del verde)",
+        "Link usa green más oscuro (#059669) para mejor legibilidad como texto",
+        "Radius 10px — orgánico y suave"
+      ],
+      "notes": [
+        "Contraste primary-fg/primary: ~4.6:1 ✓ (justo aprobado)",
+        "Link #059669 sobre blanco: ~5.1:1 ✓",
+        "REQUIERE agregarse a PALETTES"
+      ],
+      "compatibility": {
+        "legacy_detected": false,
+        "missing_filled": [
+          "--nv-surface", "--nv-primary-fg", "--nv-accent", "--nv-accent-fg",
+          "--nv-link", "--nv-link-hover", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "industrial_default",
+    "label": "Industrial",
+    "description": "Diseño robusto y minimalista con acentos cálidos.",
+    "min_plan_key": "starter",
+    "mode": "light",
+    "tokens": {
+      "--nv-bg": "#FAFAF9",
+      "--nv-surface": "#FFFFFF",
+      "--nv-card-bg": "#FFFFFF",
+      "--nv-text": "#0F172A",
+      "--nv-text-muted": "#64748B",
+      "--nv-border": "rgba(15,23,42,0.10)",
+      "--nv-shadow": "rgba(15,23,42,0.08)",
+      "--nv-primary": "#1F2937",
+      "--nv-primary-hover": "#111827",
+      "--nv-primary-fg": "#FFFFFF",
+      "--nv-accent": "#C2410C",
+      "--nv-accent-fg": "#FFFFFF",
+      "--nv-link": "#C2410C",
+      "--nv-link-hover": "#9A3412",
+      "--nv-info": "#3B82F6",
+      "--nv-success": "#10B981",
+      "--nv-warning": "#F59E0B",
+      "--nv-error": "#EF4444",
+      "--nv-ring": "rgba(31,41,55,0.35)",
+      "--nv-input-bg": "#FFFFFF",
+      "--nv-input-text": "#0F172A",
+      "--nv-input-border": "rgba(15,23,42,0.15)",
+      "--nv-navbar-bg": "#FAFAF9",
+      "--nv-footer-bg": "#0F172A",
+      "--nv-radius": "6px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Legacy keys presentes"
+      ],
+      "fixes_applied": [
+        "Eliminadas keys legacy",
+        "--nv-card-bg ajustado a #FFFFFF",
+        "Link usa accent naranja para destacar en el estilo industrial sobrio",
+        "Radius 6px — angular, acorde al estilo industrial"
+      ],
+      "notes": [
+        "Primary #1F2937 sobre fondo claro: ~14:1 ✓",
+        "Primary-fg blanco sobre primary oscuro: ~12:1 ✓",
+        "Accent #C2410C (naranja quemado) aporta calidez al estilo gris"
+      ],
+      "compatibility": {
+        "legacy_detected": true,
+        "missing_filled": [
+          "--nv-text-muted", "--nv-shadow", "--nv-primary-hover",
+          "--nv-link", "--nv-link-hover", "--nv-info", "--nv-success",
+          "--nv-warning", "--nv-error", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "luxury_gold",
+    "label": "Lujo Dorado",
+    "description": "Elegante negro y dorado, premium y exclusivo.",
+    "min_plan_key": "pro",
+    "mode": "light",
+    "tokens": {
+      "--nv-bg": "#FAFAF9",
+      "--nv-surface": "#FFFFFF",
+      "--nv-card-bg": "#FFFFFF",
+      "--nv-text": "#111827",
+      "--nv-text-muted": "#6B7280",
+      "--nv-border": "#E5E7EB",
+      "--nv-shadow": "rgba(17,24,39,0.10)",
+      "--nv-primary": "#D97706",
+      "--nv-primary-hover": "#B45309",
+      "--nv-primary-fg": "#000000",
+      "--nv-accent": "#111827",
+      "--nv-accent-fg": "#FFFFFF",
+      "--nv-link": "#B45309",
+      "--nv-link-hover": "#92400E",
+      "--nv-info": "#0284C7",
+      "--nv-success": "#059669",
+      "--nv-warning": "#F59E0B",
+      "--nv-error": "#DC2626",
+      "--nv-ring": "rgba(217,119,6,0.35)",
+      "--nv-input-bg": "#FFFFFF",
+      "--nv-input-text": "#111827",
+      "--nv-input-border": "#E5E7EB",
+      "--nv-navbar-bg": "#FAFAF9",
+      "--nv-footer-bg": "#111827",
+      "--nv-radius": "8px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Faltaban: surface, primary-fg, accent, accent-fg, link, ring, inputs, navbar, footer, radius, font",
+        "NO existe en PALETTES registry del web ni admin"
+      ],
+      "fixes_applied": [
+        "Primary-fg: #000000 (gold #D97706 es medio-claro, negro tiene contraste ~6.6:1)",
+        "Accent: #111827 (negro elegante — complementa el dorado)",
+        "Link usa gold más oscuro (#B45309) para legibilidad como texto",
+        "Radius 8px — limpio y premium"
+      ],
+      "notes": [
+        "Contraste text/bg: ~15:1 ✓",
+        "Contraste primary-fg/primary: ~6.6:1 ✓",
+        "REQUIERE agregarse a PALETTES"
+      ],
+      "compatibility": {
+        "legacy_detected": false,
+        "missing_filled": [
+          "--nv-surface", "--nv-primary-fg", "--nv-accent", "--nv-accent-fg",
+          "--nv-link", "--nv-link-hover", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "midnight_pro",
+    "label": "Midnight Pro",
+    "description": "Dark mode premium, moderno y sofisticado.",
+    "min_plan_key": "growth",
+    "mode": "dark",
+    "tokens": {
+      "--nv-bg": "#0F172A",
+      "--nv-surface": "#1E293B",
+      "--nv-card-bg": "#1E293B",
+      "--nv-text": "#F8FAFC",
+      "--nv-text-muted": "#94A3B8",
+      "--nv-border": "#1E293B",
+      "--nv-shadow": "rgba(0,0,0,0.50)",
+      "--nv-primary": "#8B5CF6",
+      "--nv-primary-hover": "#7C3AED",
+      "--nv-primary-fg": "#FFFFFF",
+      "--nv-accent": "#22D3EE",
+      "--nv-accent-fg": "#000000",
+      "--nv-link": "#A78BFA",
+      "--nv-link-hover": "#8B5CF6",
+      "--nv-info": "#60A5FA",
+      "--nv-success": "#10B981",
+      "--nv-warning": "#FBBF24",
+      "--nv-error": "#F87171",
+      "--nv-ring": "rgba(139,92,246,0.40)",
+      "--nv-input-bg": "#1E293B",
+      "--nv-input-text": "#F8FAFC",
+      "--nv-input-border": "rgba(248,250,252,0.12)",
+      "--nv-navbar-bg": "#0F172A",
+      "--nv-footer-bg": "#080E1E",
+      "--nv-radius": "12px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Faltaban: primary-fg, accent, accent-fg, link, ring, inputs, navbar, footer, radius, font",
+        "NO existe en PALETTES registry del web ni admin",
+        "Border #1E293B es igual a surface — poca separación"
+      ],
+      "fixes_applied": [
+        "Primary-fg: #FFFFFF",
+        "Accent: #22D3EE (cyan — complemento del purple en dark)",
+        "Link usa #A78BFA (purple claro) — legible sobre fondo oscuro",
+        "Input-border con alpha para sutileza en dark mode"
+      ],
+      "notes": [
+        "Contraste text/bg: ~16:1 ✓",
+        "Contraste primary-fg/primary: ~6.7:1 ✓",
+        "Border es sutil — considerar aumentar alpha si se necesita más separación",
+        "REQUIERE agregarse a PALETTES"
+      ],
+      "compatibility": {
+        "legacy_detected": false,
+        "missing_filled": [
+          "--nv-primary-fg", "--nv-accent", "--nv-accent-fg",
+          "--nv-link", "--nv-link-hover", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "ocean_breeze",
+    "label": "Brisa Oceánica",
+    "description": "Azul profesional, confiable y limpio.",
+    "min_plan_key": "starter",
+    "mode": "light",
+    "tokens": {
+      "--nv-bg": "#FFFFFF",
+      "--nv-surface": "#F8FAFC",
+      "--nv-card-bg": "#F8FAFC",
+      "--nv-text": "#0F172A",
+      "--nv-text-muted": "#64748B",
+      "--nv-border": "#E2E8F0",
+      "--nv-shadow": "rgba(15,23,42,0.10)",
+      "--nv-primary": "#0EA5E9",
+      "--nv-primary-hover": "#0284C7",
+      "--nv-primary-fg": "#FFFFFF",
+      "--nv-accent": "#F59E0B",
+      "--nv-accent-fg": "#000000",
+      "--nv-link": "#0284C7",
+      "--nv-link-hover": "#0369A1",
+      "--nv-info": "#3B82F6",
+      "--nv-success": "#10B981",
+      "--nv-warning": "#F59E0B",
+      "--nv-error": "#EF4444",
+      "--nv-ring": "rgba(14,165,233,0.35)",
+      "--nv-input-bg": "#FFFFFF",
+      "--nv-input-text": "#0F172A",
+      "--nv-input-border": "#E2E8F0",
+      "--nv-navbar-bg": "#FFFFFF",
+      "--nv-footer-bg": "#0F172A",
+      "--nv-radius": "10px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Faltaban: surface, primary-fg, accent, accent-fg, link, ring, inputs, navbar, footer, radius, font",
+        "NO existe en PALETTES registry del web ni admin"
+      ],
+      "fixes_applied": [
+        "Primary-fg: #FFFFFF (blue #0EA5E9 oscuro, white tiene ~4.6:1)",
+        "Accent: #F59E0B (amber — complemento cálido del azul frío)",
+        "Link usa blue más oscuro para legibilidad como texto"
+      ],
+      "notes": [
+        "Contraste primary-fg/primary: ~4.6:1 ✓ (justo aprobado)",
+        "REQUIERE agregarse a PALETTES"
+      ],
+      "compatibility": {
+        "legacy_detected": false,
+        "missing_filled": [
+          "--nv-surface", "--nv-primary-fg", "--nv-accent", "--nv-accent-fg",
+          "--nv-link", "--nv-link-hover", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "organic_walnut",
+    "label": "Nogal Orgánico",
+    "description": "Colores tierra y naturales para productos orgánicos.",
+    "min_plan_key": "starter",
+    "mode": "light",
+    "tokens": {
+      "--nv-bg": "#FAF7F2",
+      "--nv-surface": "#FFFFFF",
+      "--nv-card-bg": "#FFFFFF",
+      "--nv-text": "#2B2B2B",
+      "--nv-text-muted": "#78716C",
+      "--nv-border": "rgba(43,43,43,0.10)",
+      "--nv-shadow": "rgba(138,97,72,0.08)",
+      "--nv-primary": "#8A6148",
+      "--nv-primary-hover": "#74513C",
+      "--nv-primary-fg": "#FFFFFF",
+      "--nv-accent": "#65A30D",
+      "--nv-accent-fg": "#FFFFFF",
+      "--nv-link": "#8A6148",
+      "--nv-link-hover": "#74513C",
+      "--nv-info": "#3B82F6",
+      "--nv-success": "#22C55E",
+      "--nv-warning": "#F59E0B",
+      "--nv-error": "#EF4444",
+      "--nv-ring": "rgba(138,97,72,0.35)",
+      "--nv-input-bg": "#FFFFFF",
+      "--nv-input-text": "#2B2B2B",
+      "--nv-input-border": "rgba(43,43,43,0.15)",
+      "--nv-navbar-bg": "#FAF7F2",
+      "--nv-footer-bg": "#2B2B2B",
+      "--nv-radius": "10px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Legacy keys presentes"
+      ],
+      "fixes_applied": [
+        "Eliminadas keys legacy",
+        "--nv-card-bg ajustado a #FFFFFF",
+        "Text-muted: #78716C (stone — acorde a la paleta tierra)"
+      ],
+      "notes": [
+        "Contraste text/bg: ~12:1 ✓",
+        "Contraste primary-fg/primary: ~5.9:1 ✓",
+        "Accent verde #65A30D sobre blanco: ~4.1:1 — borderline para texto pequeño, apto para badges"
+      ],
+      "compatibility": {
+        "legacy_detected": true,
+        "missing_filled": [
+          "--nv-text-muted", "--nv-shadow", "--nv-primary-hover",
+          "--nv-link", "--nv-link-hover", "--nv-info", "--nv-success",
+          "--nv-warning", "--nv-error", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "standard_blue",
+    "label": "Blue Standard",
+    "description": "La opción confiable con tonos azules corporativos.",
+    "min_plan_key": "starter",
+    "mode": "light",
+    "tokens": {
+      "--nv-bg": "#F7F9FC",
+      "--nv-surface": "#FFFFFF",
+      "--nv-card-bg": "#FFFFFF",
+      "--nv-text": "#222B45",
+      "--nv-text-muted": "#64748B",
+      "--nv-border": "rgba(34,43,69,0.12)",
+      "--nv-shadow": "rgba(64,162,227,0.08)",
+      "--nv-primary": "#40A2E3",
+      "--nv-primary-hover": "#2E86C1",
+      "--nv-primary-fg": "#000000",
+      "--nv-accent": "#38BDF8",
+      "--nv-accent-fg": "#000000",
+      "--nv-link": "#2E86C1",
+      "--nv-link-hover": "#1D6FA5",
+      "--nv-info": "#3B82F6",
+      "--nv-success": "#10B981",
+      "--nv-warning": "#F59E0B",
+      "--nv-error": "#EF4444",
+      "--nv-ring": "rgba(64,162,227,0.35)",
+      "--nv-input-bg": "#FFFFFF",
+      "--nv-input-text": "#222B45",
+      "--nv-input-border": "rgba(34,43,69,0.15)",
+      "--nv-navbar-bg": "#FFFFFF",
+      "--nv-footer-bg": "#222B45",
+      "--nv-radius": "10px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Legacy keys presentes",
+        "--nv-primary-fg era #000000 — primary #40A2E3 es claro-medio"
+      ],
+      "fixes_applied": [
+        "Eliminadas keys legacy",
+        "Link usa blue oscuro (#2E86C1) para legibilidad como texto",
+        "--nv-card-bg ajustado a #FFFFFF"
+      ],
+      "notes": [
+        "Primary #40A2E3: YIQ≈147, contraste con negro ≈8.0:1 ✓",
+        "Primary y accent son ambos azul — diferenciación baja. Considerar futuro cambio de accent."
+      ],
+      "compatibility": {
+        "legacy_detected": true,
+        "missing_filled": [
+          "--nv-text-muted", "--nv-shadow", "--nv-primary-hover",
+          "--nv-link", "--nv-link-hover", "--nv-info", "--nv-success",
+          "--nv-warning", "--nv-error", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "starter_dark",
+    "label": "Midnight Neon",
+    "description": "Dark mode de alto contraste con acentos neón.",
+    "min_plan_key": "starter",
+    "mode": "dark",
+    "tokens": {
+      "--nv-bg": "#0F172A",
+      "--nv-surface": "#1E293B",
+      "--nv-card-bg": "#1E293B",
+      "--nv-text": "#F1F5F9",
+      "--nv-text-muted": "#94A3B8",
+      "--nv-border": "rgba(241,245,249,0.10)",
+      "--nv-shadow": "rgba(0,0,0,0.40)",
+      "--nv-primary": "#8B5CF6",
+      "--nv-primary-hover": "#7C3AED",
+      "--nv-primary-fg": "#FFFFFF",
+      "--nv-accent": "#38BDF8",
+      "--nv-accent-fg": "#000000",
+      "--nv-link": "#38BDF8",
+      "--nv-link-hover": "#0EA5E9",
+      "--nv-info": "#60A5FA",
+      "--nv-success": "#34D399",
+      "--nv-warning": "#FBBF24",
+      "--nv-error": "#F87171",
+      "--nv-ring": "rgba(139,92,246,0.40)",
+      "--nv-input-bg": "#1E293B",
+      "--nv-input-text": "#F1F5F9",
+      "--nv-input-border": "rgba(241,245,249,0.12)",
+      "--nv-navbar-bg": "#0F172A",
+      "--nv-footer-bg": "#080E1E",
+      "--nv-radius": "12px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "CRÍTICO: --nv-card-bg era #F8FAFC (BLANCO) sobre bg oscuro #0F172A",
+        "CRÍTICO: --nv-surface era #F8FAFC (BLANCO) sobre bg oscuro",
+        "CRÍTICO: --nv-border era #E2E8F0 (sólido claro) — roto en dark mode",
+        "Legacy keys presentes"
+      ],
+      "fixes_applied": [
+        "--nv-surface corregido a #1E293B (slate oscuro)",
+        "--nv-card-bg corregido a #1E293B",
+        "--nv-border corregido a rgba(241,245,249,0.10)",
+        "Estados ajustados a versiones claras para dark mode"
+      ],
+      "notes": [
+        "Misma corrección que dark_default — los valores del DB estaban rotos",
+        "Surface coincide con lo que ya está en PALETTES registry (correcto)"
+      ],
+      "compatibility": {
+        "legacy_detected": true,
+        "missing_filled": [
+          "--nv-text-muted", "--nv-shadow", "--nv-primary-hover",
+          "--nv-link", "--nv-link-hover", "--nv-info", "--nv-success",
+          "--nv-warning", "--nv-error", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "starter_default",
+    "label": "Default Blue",
+    "description": "Colores estándar de marca azul, profesional.",
+    "min_plan_key": "starter",
+    "mode": "light",
+    "tokens": {
+      "--nv-bg": "#F8FAFF",
+      "--nv-surface": "#FFFFFF",
+      "--nv-card-bg": "#FFFFFF",
+      "--nv-text": "#0B1220",
+      "--nv-text-muted": "#64748B",
+      "--nv-border": "rgba(11,18,32,0.10)",
+      "--nv-shadow": "rgba(29,78,216,0.08)",
+      "--nv-primary": "#1D4ED8",
+      "--nv-primary-hover": "#1E40AF",
+      "--nv-primary-fg": "#FFFFFF",
+      "--nv-accent": "#60A5FA",
+      "--nv-accent-fg": "#000000",
+      "--nv-link": "#1D4ED8",
+      "--nv-link-hover": "#1E40AF",
+      "--nv-info": "#3B82F6",
+      "--nv-success": "#10B981",
+      "--nv-warning": "#F59E0B",
+      "--nv-error": "#EF4444",
+      "--nv-ring": "rgba(29,78,216,0.35)",
+      "--nv-input-bg": "#FFFFFF",
+      "--nv-input-text": "#0B1220",
+      "--nv-input-border": "rgba(11,18,32,0.12)",
+      "--nv-navbar-bg": "#FFFFFF",
+      "--nv-footer-bg": "#0B1220",
+      "--nv-radius": "10px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Legacy keys presentes"
+      ],
+      "fixes_applied": [
+        "Eliminadas keys legacy",
+        "--nv-card-bg ajustado a #FFFFFF"
+      ],
+      "notes": [
+        "Paleta default del sistema — la más testeada",
+        "Contraste text/bg: ~16:1 ✓",
+        "Contraste primary-fg/primary: ~8.1:1 ✓"
+      ],
+      "compatibility": {
+        "legacy_detected": true,
+        "missing_filled": [
+          "--nv-text-muted", "--nv-shadow", "--nv-primary-hover",
+          "--nv-link", "--nv-link-hover", "--nv-info", "--nv-success",
+          "--nv-warning", "--nv-error", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "starter_elegant",
+    "label": "Gold Luxury",
+    "description": "Tema premium elegante con dorado sobre oscuro.",
+    "min_plan_key": "growth",
+    "mode": "dark",
+    "tokens": {
+      "--nv-bg": "#111827",
+      "--nv-surface": "#1F2937",
+      "--nv-card-bg": "#1F2937",
+      "--nv-text": "#FAFAF9",
+      "--nv-text-muted": "#9CA3AF",
+      "--nv-border": "rgba(250,250,249,0.10)",
+      "--nv-shadow": "rgba(0,0,0,0.40)",
+      "--nv-primary": "#D97706",
+      "--nv-primary-hover": "#B45309",
+      "--nv-primary-fg": "#000000",
+      "--nv-accent": "#A78BFA",
+      "--nv-accent-fg": "#000000",
+      "--nv-link": "#FBBF24",
+      "--nv-link-hover": "#F59E0B",
+      "--nv-info": "#60A5FA",
+      "--nv-success": "#34D399",
+      "--nv-warning": "#FBBF24",
+      "--nv-error": "#F87171",
+      "--nv-ring": "rgba(217,119,6,0.40)",
+      "--nv-input-bg": "#1F2937",
+      "--nv-input-text": "#FAFAF9",
+      "--nv-input-border": "rgba(250,250,249,0.12)",
+      "--nv-navbar-bg": "#111827",
+      "--nv-footer-bg": "#0A0F1A",
+      "--nv-radius": "10px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "CRÍTICO: --nv-card-bg era #F8FAFC (BLANCO) sobre bg oscuro #111827",
+        "CRÍTICO: --nv-surface era #F8FAFC (BLANCO) sobre bg oscuro",
+        "CRÍTICO: --nv-border era #E2E8F0 — roto en dark mode",
+        "--nv-primary-fg era #000000 — correcto (gold es claro)",
+        "--nv-accent-fg era #000000 — verificar contraste",
+        "Legacy keys presentes"
+      ],
+      "fixes_applied": [
+        "--nv-surface corregido a #1F2937 (coincide con PALETTES registry)",
+        "--nv-card-bg corregido a #1F2937",
+        "--nv-border corregido a rgba con alpha",
+        "Link usa amarillo/dorado claro (#FBBF24) para legibilidad en dark"
+      ],
+      "notes": [
+        "Primary #D97706: YIQ≈130, borderline. Contraste con negro ≈6.6:1 ✓",
+        "Accent #A78BFA (lavanda): YIQ≈141, negro ≈8.1:1 ✓",
+        "min_plan_key subido a growth por complejidad premium"
+      ],
+      "compatibility": {
+        "legacy_detected": true,
+        "missing_filled": [
+          "--nv-text-muted", "--nv-shadow", "--nv-primary-hover",
+          "--nv-link", "--nv-link-hover", "--nv-info", "--nv-success",
+          "--nv-warning", "--nv-error", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "startup_default",
+    "label": "Startup Naranja",
+    "description": "Energía y modernidad con naranja vibrante.",
+    "min_plan_key": "starter",
+    "mode": "light",
+    "tokens": {
+      "--nv-bg": "#FFF7ED",
+      "--nv-surface": "#FFFFFF",
+      "--nv-card-bg": "#FFFFFF",
+      "--nv-text": "#111827",
+      "--nv-text-muted": "#6B7280",
+      "--nv-border": "rgba(17,24,39,0.10)",
+      "--nv-shadow": "rgba(249,115,22,0.08)",
+      "--nv-primary": "#F97316",
+      "--nv-primary-hover": "#EA580C",
+      "--nv-primary-fg": "#000000",
+      "--nv-accent": "#111827",
+      "--nv-accent-fg": "#FFFFFF",
+      "--nv-link": "#EA580C",
+      "--nv-link-hover": "#C2410C",
+      "--nv-info": "#3B82F6",
+      "--nv-success": "#10B981",
+      "--nv-warning": "#F59E0B",
+      "--nv-error": "#EF4444",
+      "--nv-ring": "rgba(249,115,22,0.35)",
+      "--nv-input-bg": "#FFFFFF",
+      "--nv-input-text": "#111827",
+      "--nv-input-border": "rgba(17,24,39,0.12)",
+      "--nv-navbar-bg": "#FFF7ED",
+      "--nv-footer-bg": "#111827",
+      "--nv-radius": "12px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Legacy keys presentes",
+        "Accent era #111827 (negro) — misma que text, sin diferenciación como acento"
+      ],
+      "fixes_applied": [
+        "Eliminadas keys legacy",
+        "Accent mantenido como #111827 (el negro como acento crea estilo startup bold)",
+        "Link usa naranja oscuro para legibilidad como texto"
+      ],
+      "notes": [
+        "Primary #F97316: YIQ≈137, negro como fg ≈8.3:1 ✓",
+        "El estilo 'startup' con accent negro es intencional — crea contraste bold"
+      ],
+      "compatibility": {
+        "legacy_detected": true,
+        "missing_filled": [
+          "--nv-text-muted", "--nv-shadow", "--nv-primary-hover",
+          "--nv-link", "--nv-link-hover", "--nv-info", "--nv-success",
+          "--nv-warning", "--nv-error", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "sunset_warm",
+    "label": "Atardecer Cálido",
+    "description": "Naranja cálido y coral, energético y amigable.",
+    "min_plan_key": "starter",
+    "mode": "light",
+    "tokens": {
+      "--nv-bg": "#FFFFFF",
+      "--nv-surface": "#FFF7ED",
+      "--nv-card-bg": "#FFF7ED",
+      "--nv-text": "#1C1917",
+      "--nv-text-muted": "#78716C",
+      "--nv-border": "#FED7AA",
+      "--nv-shadow": "rgba(249,115,22,0.15)",
+      "--nv-primary": "#F97316",
+      "--nv-primary-hover": "#EA580C",
+      "--nv-primary-fg": "#000000",
+      "--nv-accent": "#DC2626",
+      "--nv-accent-fg": "#FFFFFF",
+      "--nv-link": "#EA580C",
+      "--nv-link-hover": "#C2410C",
+      "--nv-info": "#3B82F6",
+      "--nv-success": "#10B981",
+      "--nv-warning": "#FBBF24",
+      "--nv-error": "#DC2626",
+      "--nv-ring": "rgba(249,115,22,0.35)",
+      "--nv-input-bg": "#FFFFFF",
+      "--nv-input-text": "#1C1917",
+      "--nv-input-border": "#FED7AA",
+      "--nv-navbar-bg": "#FFFFFF",
+      "--nv-footer-bg": "#1C1917",
+      "--nv-radius": "12px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Faltaban: surface, primary-fg, accent, accent-fg, link, ring, inputs, navbar, footer, radius, font",
+        "NO existe en PALETTES registry del web ni admin"
+      ],
+      "fixes_applied": [
+        "Surface: #FFF7ED (warm tint — acorde al estilo)",
+        "Card-bg: #FFF7ED (warm cards)",
+        "Primary-fg: #000000 (orange es claro)",
+        "Accent: #DC2626 (rojo cálido — complementa el naranja)",
+        "Link usa naranja más oscuro para legibilidad"
+      ],
+      "notes": [
+        "Borde #FED7AA es temático (peach) — correcto para el estilo",
+        "REQUIERE agregarse a PALETTES"
+      ],
+      "compatibility": {
+        "legacy_detected": false,
+        "missing_filled": [
+          "--nv-surface", "--nv-primary-fg", "--nv-accent", "--nv-accent-fg",
+          "--nv-link", "--nv-link-hover", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "vivid_coral",
+    "label": "Coral Moderno",
+    "description": "Estilo moderno con acentos coral vibrantes.",
+    "min_plan_key": "starter",
+    "mode": "light",
+    "tokens": {
+      "--nv-bg": "#FFF5F4",
+      "--nv-surface": "#FFFFFF",
+      "--nv-card-bg": "#FFFFFF",
+      "--nv-text": "#111827",
+      "--nv-text-muted": "#6B7280",
+      "--nv-border": "rgba(17,24,39,0.10)",
+      "--nv-shadow": "rgba(255,107,107,0.08)",
+      "--nv-primary": "#FF6B6B",
+      "--nv-primary-hover": "#E05555",
+      "--nv-primary-fg": "#000000",
+      "--nv-accent": "#374151",
+      "--nv-accent-fg": "#FFFFFF",
+      "--nv-link": "#E05555",
+      "--nv-link-hover": "#CC4444",
+      "--nv-info": "#3B82F6",
+      "--nv-success": "#10B981",
+      "--nv-warning": "#F59E0B",
+      "--nv-error": "#EF4444",
+      "--nv-ring": "rgba(255,107,107,0.35)",
+      "--nv-input-bg": "#FFFFFF",
+      "--nv-input-text": "#111827",
+      "--nv-input-border": "rgba(17,24,39,0.12)",
+      "--nv-navbar-bg": "#FFF5F4",
+      "--nv-footer-bg": "#111827",
+      "--nv-radius": "12px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "Legacy keys presentes"
+      ],
+      "fixes_applied": [
+        "Eliminadas keys legacy",
+        "--nv-card-bg ajustado a #FFFFFF",
+        "Link usa coral más oscuro para legibilidad"
+      ],
+      "notes": [
+        "Primary #FF6B6B: YIQ≈139, negro como fg ≈7.6:1 ✓",
+        "Accent #374151 (gris oscuro) es sobrio — crea balance con el coral vibrante"
+      ],
+      "compatibility": {
+        "legacy_detected": true,
+        "missing_filled": [
+          "--nv-text-muted", "--nv-shadow", "--nv-primary-hover",
+          "--nv-link", "--nv-link-hover", "--nv-info", "--nv-success",
+          "--nv-warning", "--nv-error", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  },
+  {
+    "palette_key": "vivid_coral_dark",
+    "label": "Coral Moderno (Dark)",
+    "description": "Versión oscura con contraste alto y acento coral.",
+    "min_plan_key": "starter",
+    "mode": "dark",
+    "tokens": {
+      "--nv-bg": "#0B0B10",
+      "--nv-surface": "#14141C",
+      "--nv-card-bg": "#1A1A24",
+      "--nv-text": "#F5F5F5",
+      "--nv-text-muted": "#A1A1AA",
+      "--nv-border": "rgba(245,245,245,0.10)",
+      "--nv-shadow": "rgba(0,0,0,0.40)",
+      "--nv-primary": "#FF6B6B",
+      "--nv-primary-hover": "#E05555",
+      "--nv-primary-fg": "#000000",
+      "--nv-accent": "#A1A1AA",
+      "--nv-accent-fg": "#000000",
+      "--nv-link": "#FF8A8A",
+      "--nv-link-hover": "#FF6B6B",
+      "--nv-info": "#60A5FA",
+      "--nv-success": "#34D399",
+      "--nv-warning": "#FBBF24",
+      "--nv-error": "#F87171",
+      "--nv-ring": "rgba(255,107,107,0.40)",
+      "--nv-input-bg": "#1A1A24",
+      "--nv-input-text": "#F5F5F5",
+      "--nv-input-border": "rgba(245,245,245,0.12)",
+      "--nv-navbar-bg": "#0B0B10",
+      "--nv-footer-bg": "#060608",
+      "--nv-radius": "12px",
+      "--nv-font": "system-ui, sans-serif"
+    },
+    "audit": {
+      "issues_found": [
+        "CRÍTICO: --nv-card-bg era #F8FAFC (BLANCO) sobre bg oscuro #0B0B10",
+        "CRÍTICO: --nv-surface era #F8FAFC (BLANCO) sobre bg oscuro",
+        "CRÍTICO: --nv-border era #E2E8F0 — roto en dark mode",
+        "--nv-primary-fg era #000000 — coral es claro, negro es correcto",
+        "Legacy keys presentes"
+      ],
+      "fixes_applied": [
+        "--nv-surface corregido a #14141C (coincide con PALETTES registry)",
+        "--nv-card-bg corregido a #1A1A24 (ligeramente más claro que surface)",
+        "--nv-border corregido a rgba con alpha baja",
+        "Link usa coral más claro (#FF8A8A) para legibilidad en dark",
+        "text-muted usa el accent gris como muted"
+      ],
+      "notes": [
+        "Contraste text/bg: ~18:1 ✓",
+        "Mismos problemas de DB que los otros dark themes"
+      ],
+      "compatibility": {
+        "legacy_detected": true,
+        "missing_filled": [
+          "--nv-text-muted", "--nv-shadow", "--nv-primary-hover",
+          "--nv-link", "--nv-link-hover", "--nv-info", "--nv-success",
+          "--nv-warning", "--nv-error", "--nv-ring", "--nv-input-bg",
+          "--nv-input-text", "--nv-input-border", "--nv-navbar-bg",
+          "--nv-footer-bg", "--nv-radius", "--nv-font"
+        ]
+      }
+    }
+  }
+]

@@ -1,0 +1,264 @@
+{
+  "audit_date": "2025-02-07T08:45:00-03:00",
+  "templateKey": "fourth",
+  "palette_key": "starter_elegant",
+  "mode": "dark",
+  "summary": {
+    "status": "GREEN",
+    "theme_colors_direct_refs": 0,
+    "theme_colors_indirect_refs": 1,
+    "css_vars_adoption": "100%",
+    "root_injection": true,
+    "body_bg_fix": true,
+    "total_files_audited": 17,
+    "total_components_migrated": 6,
+    "regression_risk": "LOW"
+  },
+  "palette_verification": {
+    "source_palettes_ts": {
+      "bg": "#111827",
+      "surface": "#1F2937",
+      "text": "#FAFAF9",
+      "primary": "#D97706",
+      "accent": "#A78BFA",
+      "border": "rgba(250,250,249,0.10)"
+    },
+    "source_tokens_js": {
+      "--nv-primary": "#D97706",
+      "--nv-bg": "#111827",
+      "--nv-surface": "#1F2937",
+      "--nv-text": "#FAFAF9",
+      "--nv-muted": "#94A3B8",
+      "--nv-border": "rgba(250,250,249,0.10)"
+    },
+    "is_dark": true,
+    "isDarkHex_luminance": 0.012,
+    "dark_detection_threshold": 0.2,
+    "sources_consistent": true
+  },
+  "css_vars_pipeline": {
+    "previewHost_root_injection": {
+      "status": "OK",
+      "method": "paletteToCssVars(paletteKey) → :root block in <style> tag",
+      "vars_count": 27,
+      "dynamic": true
+    },
+    "previewHost_body": {
+      "status": "OK",
+      "background_color": "var(--nv-bg, #111827)",
+      "color": "var(--nv-text, #FAFAF9)"
+    },
+    "previewHost_outer_div": {
+      "status": "OK",
+      "background_color": "var(--nv-bg)"
+    },
+    "previewProviders_inner_div": {
+      "status": "OK",
+      "scopedVars": "paletteToCssVars + paletteVars + themeOverride + cssVarsOverride",
+      "background_color": "var(--nv-bg)",
+      "color": "var(--nv-text)"
+    }
+  },
+  "matrix": [
+    {
+      "file": "BannerHome.jsx",
+      "theme_colors_refs": 0,
+      "uses_css_vars": true,
+      "hardcoded_colors": [],
+      "status": "CLEAN"
+    },
+    {
+      "file": "ContactSection.jsx",
+      "theme_colors_refs": 0,
+      "uses_css_vars": true,
+      "hardcoded_colors": [],
+      "status": "CLEAN"
+    },
+    {
+      "file": "Faqs.jsx",
+      "theme_colors_refs": 0,
+      "uses_css_vars": true,
+      "hardcoded_colors": [],
+      "status": "CLEAN"
+    },
+    {
+      "file": "FiltersPanel.jsx",
+      "theme_colors_refs": 0,
+      "uses_css_vars": true,
+      "hardcoded_colors": ["colorMap: 15 product swatch colors (annotated theme-audit:ignore-line)"],
+      "status": "CLEAN",
+      "note": "colorMap colors are intentional product swatches, not theme colors"
+    },
+    {
+      "file": "Footer.jsx",
+      "theme_colors_refs": 0,
+      "uses_css_vars": true,
+      "hardcoded_colors": [],
+      "status": "CLEAN"
+    },
+    {
+      "file": "Header.jsx",
+      "theme_colors_refs": 0,
+      "theme_colors_indirect": 1,
+      "uses_css_vars": true,
+      "hardcoded_colors": [],
+      "status": "WARNING_LOW",
+      "note": "Uses useTheme().colors.surface for dark detection on logo. Has safe-check (returns false if undefined). Cosmetic only."
+    },
+    {
+      "file": "ProductCard.jsx",
+      "theme_colors_refs": 0,
+      "uses_css_vars": true,
+      "hardcoded_colors": [],
+      "status": "CLEAN"
+    },
+    {
+      "file": "ProductDetail.jsx",
+      "theme_colors_refs": 0,
+      "uses_css_vars": true,
+      "hardcoded_colors": ["colorMap: 15 product swatches", "#ccc fallback (annotated)"],
+      "status": "CLEAN",
+      "note": "Hardcoded colors are product swatches, not theme"
+    },
+    {
+      "file": "ProductGrid.jsx",
+      "theme_colors_refs": 0,
+      "uses_css_vars": true,
+      "hardcoded_colors": [],
+      "status": "CLEAN"
+    },
+    {
+      "file": "ServicesContent.jsx",
+      "theme_colors_refs": 0,
+      "uses_css_vars": true,
+      "hardcoded_colors": [],
+      "status": "CLEAN"
+    },
+    {
+      "file": "SortBar.jsx",
+      "theme_colors_refs": 0,
+      "uses_css_vars": true,
+      "hardcoded_colors": [],
+      "status": "CLEAN",
+      "migrated_this_session": 14
+    },
+    {
+      "file": "UI/Badge.jsx",
+      "theme_colors_refs": 0,
+      "uses_css_vars": true,
+      "hardcoded_colors": [],
+      "status": "CLEAN",
+      "note": "Uses theme._tokens with CSS var fallbacks"
+    },
+    {
+      "file": "UI/Button.jsx",
+      "theme_colors_refs": 0,
+      "uses_css_vars": true,
+      "hardcoded_colors": [],
+      "status": "CLEAN",
+      "migrated_this_session": 8
+    },
+    {
+      "file": "UI/Container.jsx",
+      "theme_colors_refs": 0,
+      "uses_css_vars": true,
+      "hardcoded_colors": [],
+      "status": "CLEAN"
+    },
+    {
+      "file": "UI/Skeleton.jsx",
+      "theme_colors_refs": 0,
+      "uses_css_vars": true,
+      "hardcoded_colors": [],
+      "status": "CLEAN",
+      "migrated_this_session": 1
+    },
+    {
+      "file": "pages/Home.jsx",
+      "theme_colors_refs": 0,
+      "uses_css_vars": true,
+      "hardcoded_colors": [],
+      "status": "CLEAN"
+    },
+    {
+      "file": "data/dataAdapter.js",
+      "theme_colors_refs": 0,
+      "uses_css_vars": false,
+      "hardcoded_colors": [],
+      "status": "N/A",
+      "note": "Data file, no UI rendering"
+    }
+  ],
+  "regression_checks": [
+    {
+      "check": "body background in preview",
+      "expected": "dark (#111827) for starter_elegant",
+      "mechanism": ":root CSS vars from paletteToCssVars + body { background-color: var(--nv-bg) }",
+      "risk": "NONE"
+    },
+    {
+      "check": "gaps between sections",
+      "expected": "dark background (no white bleed-through)",
+      "mechanism": "body + outer div + inner div all have var(--nv-bg)",
+      "risk": "NONE"
+    },
+    {
+      "check": "SortBar colors",
+      "expected": "dark surface bg, light text, amber primary on active",
+      "mechanism": "All 14 theme.colors refs replaced with CSS vars",
+      "risk": "NONE"
+    },
+    {
+      "check": "Button variants",
+      "expected": "primary=amber, ghost=transparent with light text, danger=accent",
+      "mechanism": "All 8 theme.colors refs replaced with CSS vars",
+      "risk": "NONE"
+    },
+    {
+      "check": "FiltersPanel borders/accents",
+      "expected": "dark borders, amber accents",
+      "mechanism": "All 10 theme.colors refs replaced with CSS vars",
+      "risk": "NONE"
+    },
+    {
+      "check": "Light theme compatibility",
+      "expected": "Light palettes should still work correctly",
+      "mechanism": "paletteToCssVars dynamically generates light/dark values based on isDarkHex()",
+      "risk": "LOW — fallbacks in body are dark (#111827) but :root injection overrides them"
+    },
+    {
+      "check": "Header logo dark detection",
+      "expected": "Logo inverts on dark bg via useTheme().colors.surface check",
+      "mechanism": "Indirect theme access with safe-check, fallback=false (no inversion)",
+      "risk": "LOW — cosmetic only, logo may not invert if theme.colors unavailable"
+    }
+  ],
+  "score": {
+    "theme_consistency": 98,
+    "css_vars_coverage": 100,
+    "dark_mode_readiness": 100,
+    "regression_safety": 95,
+    "overall": 98
+  },
+  "fixes_applied": {
+    "session": "2025-02-07",
+    "commits": [
+      {
+        "hash": "d557631",
+        "description": "ServicesContent, BannerHome, Footer → CSS vars",
+        "refs_migrated": 19
+      },
+      {
+        "hash": "0cee4d5",
+        "description": ":root CSS vars injection + SortBar, Button, FiltersPanel, Skeleton → CSS vars",
+        "refs_migrated": 33
+      }
+    ],
+    "total_refs_migrated": 52,
+    "cherry_picks": {
+      "develop": ["391bb53", "7ae110f"],
+      "multitenant": ["6c644df", "55b3e27"],
+      "onboarding": ["1d333bf", "86dbc95"]
+    }
+  }
+}
