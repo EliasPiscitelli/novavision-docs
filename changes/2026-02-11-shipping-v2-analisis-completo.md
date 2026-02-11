@@ -4,7 +4,7 @@
 **Autor:** agente-copilot  
 **Rama API:** `feature/automatic-multiclient-onboarding`  
 **Rama Web:** `feature/multitenant-storefront`  
-**Estado:** PLAN — pendiente aprobación del TL
+**Estado:** ✅ COMPLETADO — Todas las fases implementadas (MVP + Phase 4)
 
 ---
 
@@ -1490,12 +1490,17 @@ if (reQuote.expired || reQuote.priceChanged) {
 - ✅ Admin presets + advanced config
 - ✅ Seguridad: HTML escape, PII limits, rate limiting
 
-**EXCLUIDO de MVP (Fase 4 — Post-MVP):**
-- ❌ Provider API (Andreani/OCA/Correo Argentino) — requiere `weight_grams`
-- ❌ Mapa Leaflet en checkout — solo link Google Maps
-- ❌ Nominatim autocomplete — solo validación básica de CP
-- ❌ Geocoding/lat-lng storage — no necesario sin mapa
-- ❌ Tracking embebido en storefront (ya existe V1 pero no vinculado a delivery)
+**Fase 4 (Post-MVP) — COMPLETADO ✅:**
+- ✅ Provider API (Andreani/OCA/Correo Argentino) — `quoteRates()` implementado en los 3 providers
+- ✅ `weight_grams` en tabla products (migración + campo en ProductModal + default 500g)
+- ✅ Mapa Leaflet en checkout — `AddressVerifyMap` con pin arrastrable (lazy-loaded)
+- ✅ Nominatim geocoding — hook `useNominatim` con rate limiting y User-Agent
+- ✅ Tracking embebido en storefront — `TrackingPage` pública + `OrderDetail` + `PaymentResultPage`
+- ✅ Seed de `client_shipping_settings` en onboarding (ambos flujos)
+- ✅ Validación estricta de `pricing_mode` (zone/flat/provider_api) con 400 si inválido
+- ✅ Validación `origin_address` obligatoria para `provider_api`
+- ✅ `delivery_method` visible en OrderDashboard (buyer + admin)
+- ✅ Documentación completa del modelo de configuración: `architecture/SHIPPING_CONFIG_MODEL.md`
 
 ---
 
@@ -1546,10 +1551,36 @@ if (reQuote.expired || reQuote.priceChanged) {
 | **1** | B1 (Settings/Zones) + B5 (Admin Panel V2) | Admin puede configurar envío completo | 2-3 días |
 | **2** | B2 (Quote) + B3 (Checkout) + Addresses | Comprador elige método y paga con envío | 3-4 días |
 | **3** | B4 (Pre-order) + B6 (Email/OrderDetail/PaymentResult) | Orden persiste shipping, email, confirmación | 2-3 días |
-| **4 (Post-MVP)** | Provider API + Mapa Leaflet + Nominatim | Cotización real + UX avanzada | 5-8 días |
+| **4 (Post-MVP)** | Provider API + Mapa Leaflet + Nominatim | Cotización real + UX avanzada | ✅ Completado |
 
-**Total MVP (Fases 1-3):** ~7-10 días de desarrollo.
+**Total (Fases 1-4):** COMPLETADO.
 
 ---
 
-*Documento actualizado post-review del TL — todas las correcciones incorporadas.*
+## Commits de implementación
+
+### Fase A — Seguridad y Robustez
+- `46f4fc7` — Webhook signature validation + rate limiting en quote
+- `3136f49` — ShippingGuides sin "Próximamente" para providers implementados
+
+### Fase B — Tests
+- `7a2d7a1` — 124 tests en 5 suites (Settings, Quote, Core, Providers, Addresses)
+
+### Fase C — Mejoras de UX
+- `ec1a09d` — Email notifications al comprador en cambios de tracking
+- `973871e` / `6c64dbd` — ShippingEstimator en PDP (web + develop)
+
+### Fase D — Mejoras Operativas
+- `d7b5efe` — Retry/DLQ para webhooks fallidos
+- `26e3c8a` / `2d3bca6` — Admin Panel shipping view (API + Admin)
+- `ebc6249` / `e2b01ab` — Checkout multi-step stepper (web + develop)
+
+### Phase 4 — Modelo de Configuración
+- `f19788b` — Seed settings en onboarding + validación pricing mode + origin_address
+- `847f119` / `280c35c` — Delivery method en OrderDashboard (web + develop)
+- `a6c16dd` — Documentación del modelo de configuración
+- `d7325ff` — Tracking doc actualizado
+
+---
+
+*Documento actualizado — todas las fases completadas e implementadas.*
