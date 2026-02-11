@@ -2,9 +2,29 @@
 
 - **Autor:** agente-copilot
 - **Fecha:** 2026-02-11
+- **Estado:** ✅ COMPLETADO — Todas las fases implementadas
 - **Rama Web:** feature/multitenant-storefront
 - **Rama API:** feature/automatic-multiclient-onboarding
 - **Rama Admin:** feature/automatic-multiclient-onboarding
+
+## Commits finales
+
+| Repo | Commit | Descripción | Rama |
+|------|--------|-------------|------|
+| Web | `ab0d5f3` | Fases 1+2+3: UX collapse, validaciones FE, lazy addresses | multitenant-storefront |
+| Web | `667f811` | Cherry-pick a develop | develop |
+| Web | `32d9ac5` | Fix deliveryEnabled null crash (settings?.deliveryEnabled) | multitenant-storefront |
+| Web | `3b550f2` | Cherry-pick a develop | develop |
+| Web | `0361478` | Fix useAddresses: no setear error state en 400 | multitenant-storefront |
+| Web | `1fcadfe` | Cherry-pick a develop | develop |
+| API | `3bb3371` | Fase 4 BE: provider catalog + validaciones server | automatic-multiclient-onboarding |
+| API | `7f9f6f2` | Fix let→const mercadopago.service | automatic-multiclient-onboarding |
+| API | `962107b` | Fix addresses resiliente a tabla inexistente | automatic-multiclient-onboarding |
+| Admin | `a0faaaf` | Fase 4 Admin: tab Providers en ShippingView | automatic-multiclient-onboarding |
+
+## Migraciones ejecutadas
+- `ADMIN_059_platform_shipping_providers.sql` → Admin DB ✅
+- `20260211_user_addresses.sql` → Backend DB (ya existía) ✅
 
 ---
 
@@ -130,10 +150,20 @@ Alto. Toca DB + BE + Admin. Requiere migración + seed. Feature flag recomendado
 
 ## Orden de ejecución
 
-1. Fase 1 (UX inmediato)
-2. Fase 2 (validaciones)
-3. Fase 3 (elimina error 400)
-4. Fase 4 (feature nueva, branch separada)
+1. ✅ Fase 1 (UX inmediato) — commit `ab0d5f3`
+2. ✅ Fase 2 FE (validaciones) — commit `ab0d5f3`
+3. ✅ Fase 2 BE (validaciones server) — commit `3bb3371`
+4. ✅ Fase 3 (elimina error 400) — commit `ab0d5f3`
+5. ✅ Fase 4 BE (provider catalog) — commit `3bb3371`
+6. ✅ Fase 4 Admin (providers tab) — commit `a0faaaf`
+
+## Bugfixes adicionales (descubiertos durante implementación)
+- `settings.deliveryEnabled` → `settings?.deliveryEnabled` en useShipping (null crash) — `32d9ac5`
+- useAddresses no setea error state en 400 (estado esperado) — `0361478`
+- addresses.service.ts resiliente a tabla inexistente (devuelve []) — `962107b`
+
+## Cherry-pick a onboarding-preview-stable
+**No necesario** — la rama `feature/onboarding-preview-stable` no contiene los hooks de shipping/checkout (useShipping.js, useAddresses.js no existen en esa rama).
 
 ## Notas de seguridad
 - Fase 4 requiere `SuperAdminGuard` en endpoints nuevos
