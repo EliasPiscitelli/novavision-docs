@@ -111,9 +111,7 @@ Los pendientes son de **calidad, seguridad y robustez**.
 ## Orden de Ejecución
 
 ```
-A1 → A2 → A3 → B1 → B2 → B3 → B4 → B5 → [commit/push]
-         ↓
-    (Fase C y D son opcionales, se encaran en otro ciclo)
+A1 → A2 → A3 → B1 → B2 → B3 → B4 → B5 → C1 → C2 → D1 → [commit/push]
 ```
 
 Cada tarea se commitea individualmente tras verificar lint + typecheck.
@@ -133,5 +131,21 @@ Cada tarea se commitea individualmente tras verificar lint + typecheck.
   - ShippingService: 40 tests
   - Providers (Manual/Andreani/OCA/CorreoArgentino): 26 tests
   - AddressesService: 10 tests
+- [x] C1: Email notification al comprador en cambios de tracking — commit `ec1a09d`
+  - ShippingNotificationService con templates HTML, deduplicación, fire-and-forget
+  - Notifica en: picked_up, in_transit, out_for_delivery, delivered, failed, returned
+- [x] C2: Estimación de entrega en PDP — commit `973871e` (web) + cherry-pick `6c64dbd` (develop)
+  - ShippingEstimator component con input de CP + provincia
+  - Llama POST /shipping/quote en tiempo real
+  - Muestra costo, envío gratis, días estimados, zona
+- [x] D1: Retry/DLQ para webhooks fallidos — commit `d7b5efe`
+  - ShippingWebhookRetryService con backoff exponencial (1m/5m/15m)
+  - Dead Letter Queue tras 3 intentos fallidos
+  - Migración: tabla shipping_webhook_failures
+  - Endpoints admin: GET /shipping/webhook-failures, POST .../retry
 - [x] Commits atómicos con formato `feat(api):` / `fix(web):`
 - [x] Push a ramas correspondientes + cherry-pick a develop (web)
+
+### Pendientes (nice-to-have, fuera de este ciclo)
+- [ ] D2: Vista shipping en Admin Panel (super_admin)
+- [ ] D3: Checkout multi-page/stepper
