@@ -146,6 +146,15 @@ Cada tarea se commitea individualmente tras verificar lint + typecheck.
 - [x] Commits atómicos con formato `feat(api):` / `fix(web):`
 - [x] Push a ramas correspondientes + cherry-pick a develop (web)
 
-### Pendientes (nice-to-have, fuera de este ciclo)
-- [ ] D2: Vista shipping en Admin Panel (super_admin)
-- [ ] D3: Checkout multi-page/stepper
+### Completados (última sesión)
+- [x] D2: Vista shipping en Admin Panel (super_admin) — API commit `26e3c8a` + Admin commit `2d3bca6`
+  - AdminShippingController con 5 endpoints (settings, integrations, shipments, zones, webhook-failures)
+  - ShippingView.jsx (~700 líneas) con 4 tabs: Configuración, Integraciones, Envíos, Webhook Failures
+  - Ruta /admin/shipping en sidebar del admin panel
+- [x] D3: Checkout multi-step stepper — Web commit `ebc6249` + cherry-pick `e2b01ab` (develop)
+  - useCheckoutStepper hook (nav + validación por gate + sessionStorage)
+  - CheckoutStepper container con header de progreso, sidebar resumen, nav footer
+  - 4 pasos: CartStep, ShippingStep (reutiliza ShippingSection), PaymentStep (reutiliza PlanSelector), ConfirmationStep
+  - CartPage reducido a wrapper de 16 líneas
+  - Mobile responsive: nav fijo bottom, stacked layout ≤768px
+  - Slide animations con dirección (forward/back)
