@@ -1499,32 +1499,43 @@ if (reQuote.expired || reQuote.priceChanged) {
 
 ---
 
-### 24.9 Decisiones pendientes de confirmar
+### 24.9 Decisiones confirmadas
 
-#### A) Guest Checkout
+#### A) Guest Checkout — ✅ SOLO LOGUEADOS
 
-**Pregunta:** `user_addresses` asume usuario logueado (`user_id FK`). ¿Existe guest checkout?
+**Decisión:** No existe guest checkout. El comprador debe estar logueado para comprar.
 
-**Opciones:**
-1. **No existe guest checkout** (actual): todo OK. Address book solo para logueados.
-2. **Sí existe**: la dirección se guarda solo en `orders.shipping_address` (JSONB). No se persiste en `user_addresses`. El form pide los mismos campos pero sin "guardar dirección".
+- `user_addresses` funciona con `user_id FK` sin problemas
+- Address book disponible para todos los compradores logueados
+- Sin necesidad de flujo alternativo para guests
+- Simplifica la implementación: un solo camino en checkout
 
-**Recomendación:** Confirmar el flujo actual. Si es solo logueados, no hay cambio. Si hay guests, agregar flag `isGuest` al flujo de checkout.
+#### B) Zone Match Logic — ✅ OR CON PRIORIDAD (CP > Provincia)
 
-#### B) Zone Match Logic — AND vs OR
+**Decisión:** OR con prioridad. El CP es más específico y "gana" sobre la provincia.
 
-**Pregunta:** Cuando una zona tiene tanto `zip_codes[]` como `provinces[]`, ¿cómo matchear?
-
-**Decisión propuesta (arriba en 24.2):**
+**Algoritmo definitivo:**
 ```
-1. zip_codes primero (exacto o prefijo) → si matchea, es ESA zona
-2. Si no hay zip_codes o no matchea → fallback a provinces
-3. Múltiples matches → menor position gana
+1. Buscar zonas donde zip_codes[] contenga el CP del comprador (exacto)
+   → Si matchea → usar esa zona
+2. Si no matchea por CP (o la zona no tiene zip_codes) → buscar por province
+   → Si matchea → usar esa zona
+3. Si múltiples zonas matchean → tomar la de menor position (prioridad)
+4. Si ninguna matchea → "No hay envío disponible para tu zona"
 ```
 
-Esto es **OR con prioridad**: zip_code es más específico, province es fallback. El admin puede definir zonas solo con provinces (simple) o agregar zip_codes para excepciones (avanzado).
+**Ejemplo práctico:**
+| Zona | Provincias | CPs (opcional) | Costo | Position |
+|------|-----------|----------------|-------|----------|
+| CABA Express | `['CABA']` | `['1000','1001','1002']` | $800 | 1 |
+| Buenos Aires | `['Buenos Aires','CABA']` | *(vacío)* | $1500 | 2 |
 
-**Confirmar:** ¿Este approach es correcto o preferís AND (ambos deben matchear)?
+- CP 1000 + CABA → matchea "CABA Express" por CP ($800)
+- CP 1425 + CABA → no matchea por CP → matchea por provincia → "CABA Express" (position 1) → $800
+- CP 7000 + Buenos Aires → matchea "Buenos Aires" por provincia → $1500
+- CP 5000 + Córdoba → no matchea → "No hay envío disponible"
+
+**Ventaja:** Simple para el admin. Define zonas amplias por provincia, y opcionalmente refina con CPs para excepciones.
 
 ---
 
