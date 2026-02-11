@@ -158,3 +158,20 @@ Cada tarea se commitea individualmente tras verificar lint + typecheck.
   - CartPage reducido a wrapper de 16 líneas
   - Mobile responsive: nav fijo bottom, stacked layout ≤768px
   - Slide animations con dirección (forward/back)
+
+### Phase 4 — Modelo de Configuración (sesión actual)
+- [x] Seed shipping settings en onboarding — API commit `f19788b`
+  - Flujo A (trial/draft): step 7.2 con upsert onConflict client_id
+  - Flujo B (post-pago): step 9.2 con upsert onConflict client_id
+  - Defaults: todos los métodos deshabilitados, pricing_mode=zone
+- [x] Validación estricta de pricing mode — API commit `f19788b`
+  - upsertSettings: rechaza valores != zone/flat/provider_api con 400
+  - upsertSettings: origin_address obligatoria si provider_api + delivery habilitado
+  - calculateDeliveryCost: default case lanza 400 en vez de retornar cost 0
+- [x] Delivery method en OrderDashboard — Web commit `847f119` + cherry-pick `280c35c` (develop)
+  - Labels: 🚚 Envío, 🏪 Retiro, 💬 Coordinar
+  - Visible en columna Envío debajo del badge de shipping_status
+- [x] Documentación completa del modelo: `architecture/SHIPPING_CONFIG_MODEL.md` — commit `a6c16dd`
+  - Default/Opcional/Excluyente claramente definido
+  - Feature gate por plan (starter vs growth+)
+  - Schema de settings, lifecycle de tienda nueva, validaciones server
