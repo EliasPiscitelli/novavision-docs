@@ -83,14 +83,14 @@ IDLE → STARTING → RUNNING(stepIndex) → COMPLETED
 
 ## 4. Roadmap por Etapas
 
-### Etapa 0 — Preparación (1-2 días)
+### ✅ Etapa 0 — Preparación (COMPLETADO)
 - Instalar driver.js
 - Crear TourProvider, TourEngine, TourOverlay, tourRegistry, tourPersistence, useTour
 - Agregar data-tour-target attrs iniciales en ProductDashboard
 - DoD: TourProvider wrappea AdminDashboard sin romper nada
 
-### Etapa 1 — MVP Products (3-4 días)
-- Tour "Crear Producto" con 15 pasos
+### ✅ Etapa 1 — MVP Products (COMPLETADO)
+- Tour "Crear Producto" con 16 pasos
 - Botón "Tutorial" en HeaderBar
 - Overlay + highlight + tooltip funcional
 - Fallback si target no existe
@@ -98,18 +98,31 @@ IDLE → STARTING → RUNNING(stepIndex) → COMPLETED
 - Mobile compatible
 - DoD: tour end-to-end en desktop y mobile sin regresiones
 
-### Etapa 2 — Modales y flows complejos (2-3 días)
-- awaitModal, click actions, guards
-- Verificación post-acción
-- Cleanup de modales al finalizar
+### ✅ Etapa 2 — Tours completos para TODAS las secciones (COMPLETADO)
+18 tours registrados, 75+ data-tour-target attrs en 18 componentes:
 
-### Etapa 3 — Escalado (5-7 días P1+P2, 5-7 días P3+P4)
-- Logo, Banners, Orders → P1
-- Services, FAQs, ContactInfo, SocialLinks → P2
-- Payments, Shipping, Identity → P3
-- Usage, Billing, Analytics, Users → P4
+| Categoría | Sección | Tour | Pasos |
+|-----------|---------|------|-------|
+| Comercio | products | Crear Producto | 16 |
+| Comercio | orders | Gestión de Pedidos | 6 |
+| Comercio | payments | Configurar Pagos | 9 |
+| Comercio | shipping | Configurar Envíos | 6 |
+| Comercio | coupons | Gestionar Cupones | 8 |
+| Branding | logo | Configurar Logo | 5 |
+| Branding | banners | Gestionar Banners | 6 |
+| Branding | services | Gestionar Servicios | 4 |
+| Branding | faqs | Preguntas Frecuentes | 4 |
+| Branding | identity | Identidad de Marca | 7 |
+| Branding | seoAutopilot | SEO Autopilot | 5 |
+| Contacto | contactInfo | Info de Contacto | 4 |
+| Contacto | socialLinks | Redes Sociales | 4 |
+| Admin | users | Gestión de Usuarios | 6 |
+| Cuenta | analytics | Métricas | 5 |
+| Cuenta | usage | Consumo y Uso | 4 |
+| Cuenta | billing | Facturación | 4 |
+| Cuenta | subscription | Gestión de Suscripción | 7 |
 
-### Etapa 4 — Observabilidad (3-4 días)
+### Etapa 3 — Observabilidad y Testing (pendiente)
 - Event tracking
 - Playwright tests
 - Modo asistido v1
