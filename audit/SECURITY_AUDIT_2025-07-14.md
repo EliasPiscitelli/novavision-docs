@@ -218,12 +218,13 @@ Sin embargo, la auditoría profunda (código + DB) revela **32 hallazgos de segu
 | **Código** | `console.log('[NestJS] Token:', token?.substring(0, 10) + '...')` |
 | **Impacto** | Los primeros 10 caracteres del JWT se logean en la consola del navegador. Visible para cualquiera con acceso a DevTools. |
 
-#### H-18 · Código legacy con `localStorage.getItem("token")` sin writer
+#### H-18 · Código legacy con `localStorage.getItem("token")` sin writer — ✅ RESUELTO Phase 4
 
 | Campo | Detalle |
-|-------|---------|
+|-------|--------|
 | **Archivos** | `IdentitySettingsTab.tsx:168,190`, `usePalettes.ts:45` |
 | **Impacto** | Leen una key `"token"` que ningún otro archivo escribe. Probablemente envían `Authorization: Bearer null`. Podrían ser exploited si un atacante escribe en esa key. |
+| **Resolución** | `usePalettes.ts` corregido: `localStorage.getItem("token")` reemplazado por `supabase.auth.getSession()` → `session.access_token`. `IdentitySettingsTab.tsx` no importado en ningún lado (código muerto, sin riesgo). |
 
 #### H-19 · SECURITY DEFINER functions sin SET search_path
 
@@ -273,13 +274,14 @@ Sin embargo, la auditoría profunda (código + DB) revela **32 hallazgos de segu
 |-------|---------|
 | **Impacto** | Si MercadoPago reenvía webhooks rápidamente, el backend puede sobrecargarse procesando duplicados. |
 
-#### H-25 · CASCADE DELETE en clients
+#### H-25 · CASCADE DELETE en clients — ⚠️ RIESGO ACEPTABLE
 
 | Campo | Detalle |
-|-------|---------|
+|-------|--------|
 | **Evidencia** | Múltiples FKs con `ON DELETE CASCADE` apuntando a `clients.id` |
 | **Impacto** | Un `DELETE` accidental o malicioso de un row en `clients` borra en cascada TODOS los datos del tenant (products, orders, users, etc.). Operación irreversible. |
 | **Remediación** | Cambiar a `ON DELETE RESTRICT` + soft delete (columna `deleted_at`). |
+| **Evaluación Phase 4** | Revisado en detalle: tablas de config (logos, faqs, contact_info, seo_settings, social_links, services) usan CASCADE — aceptable para datos satelitales. Tablas críticas (orders, payments, products) usan `NO ACTION` — bloquean la eliminación. El riesgo real es menor al evaluado inicialmente. Se mantiene como mejora futura de bajo impacto. |
 
 #### H-26 · Falta validación MIME en uploads
 
@@ -288,11 +290,12 @@ Sin embargo, la auditoría profunda (código + DB) revela **32 hallazgos de segu
 | **Archivo** | `src/products/products.controller.ts` |
 | **Impacto** | Se aceptan archivos de cualquier tipo MIME. Un atacante puede subir archivos `.html` o `.svg` con código malicioso. |
 
-#### H-27 · No hay rate limiting en endpoints de upload
+#### H-27 · No hay rate limiting en endpoints de upload — ⚠️ MITIGADO
 
 | Campo | Detalle |
-|-------|---------|
+|-------|--------|
 | **Impacto** | Combinado con H-15, permite bulk upload sin restricción, consumiendo storage rápidamente. |
+| **Evaluación Phase 4** | Existe rate limiting global via Express middleware (`rate-limit.middleware.ts` con `rate-limiter-flexible`, in-memory). Protege todos los endpoints incluyendo upload. NestJS `ThrottlerGuard` (en `rate-limiter.guard.ts`) es código muerto — no registrado en ningún módulo — pero no afecta la seguridad. Mejora futura: rate limiting diferenciado por ruta para uploads. |
 
 ---
 
@@ -302,9 +305,9 @@ Sin embargo, la auditoría profunda (código + DB) revela **32 hallazgos de segu
 
 Admin + tenant select duplicados — sin impacto de seguridad pero crea confusión en mantenimiento.
 
-#### H-29 · `_headers` file en Web tiene CSP antigua
+#### H-29 · `_headers` file en Web tiene CSP antigua — ✅ RESUELTO Phase 4
 
-El archivo `public/_headers` contiene una CSP comentada que difiere de la de `netlify.toml`. Puede causar confusión.
+El archivo `public/_headers` contenía una CSP comentada con `Access-Control-Allow-Origin: *`, `localhost:3000` y `templatetwobe` que difería de la de `netlify.toml`. Reemplazado por comentario que redirige a `netlify.toml` como fuente autoritativa.
 
 #### H-30 · `NV_CLIENT_ID` en sessionStorage
 
@@ -368,7 +371,7 @@ Verificar que todas las tablas con `client_id` tengan índice explícito — per
 | 11 | Configurar CSP estricto en Admin panel | H-13 | Medio (4h) | Protege el panel más sensible |
 | 12 | Mejorar CSP del Web (eliminar unsafe-eval/unsafe-inline) | H-12 | Medio (1 día) | Reduce superficie de XSS |
 | 13 | Agregar security headers a ambos frontends | H-21, H-22 | Bajo (2h) | HSTS, X-Frame-Options, etc. |
-| 14 | Limpiar código legacy con `localStorage.getItem("token")` | H-18 | Bajo (30min) | Elimina vector latente |
+| 14 | ~~Limpiar código legacy con `localStorage.getItem("token")`~~ | H-18 | ~~Bajo (30min)~~ | ✅ Phase 4 — `usePalettes.ts` corregido, `IdentitySettingsTab.tsx` código muerto |
 | 15 | Agregar `SET search_path` a funciones SECURITY DEFINER | H-19 | Medio (4h) | Previene search_path injection |
 
 ### Fase 3 — Semana 3-4: Defense in depth
@@ -378,9 +381,9 @@ Verificar que todas las tablas con `client_id` tengan índice explícito — per
 | 16 | Agregar validación MIME + file limits en interceptors | H-15, H-26 | Bajo (2h) | Previene uploads maliciosos |
 | 17 | Habilitar RLS en `provisioning_job_steps` | H-20 | Bajo (1h) | Completa cobertura RLS |
 | 18 | Eliminar ngrok de CORS en producción | H-23 | Bajo (30min) | Cierra vector CORS |
-| 19 | Cambiar CASCADE DELETE a RESTRICT + soft delete | H-25 | Alto (1 día) | Previene borrado catastrófico |
+| 19 | ~~Cambiar CASCADE DELETE a RESTRICT + soft delete~~ | H-25 | ~~Alto (1 día)~~ | ⚠️ Re-evaluado Phase 4: tablas críticas ya usan NO ACTION. Riesgo aceptable. |
 | 20 | Configurar CORS dinámico en Web (edge function) | H-14 | Medio (4h) | Limita origen de requests |
-| 21 | Rate limiting en endpoints de upload | H-27 | Bajo (1h) | Previene abuse de storage |
+| 21 | ~~Rate limiting en endpoints de upload~~ | H-27 | ~~Bajo (1h)~~ | ⚠️ Mitigado Phase 4: rate limiting global activo vía Express middleware. |
 
 ---
 
@@ -406,7 +409,7 @@ Verificar que todas las tablas con `client_id` tengan índice explícito — per
 
 ### Frontend
 - [ ] `grep -r "sessionStorage.*internal_key" src/` devuelve 0 resultados (migrado a httpOnly cookie) — DIFERIDO (cross-origin complexity)
-- [ ] `grep -r "localStorage.*token" src/` — solo builder_token con cleanup automático
+- [x] `grep -r "localStorage.*token" src/` — `usePalettes.ts` corregido a `supabase.auth.getSession()`. `IdentitySettingsTab.tsx` es código muerto. `builder_token` tiene cleanup automático en StorefrontAdminGuard. ✅ Phase 4
 - [x] `Content-Security-Policy` configurado en admin netlify.toml sin `unsafe-eval` ✅ Phase 2
 - [x] `Content-Security-Policy` en web endurecido ✅ Phase 3 — `unsafe-eval` mantenido (requerido por MercadoPago SDK), `localhost:3000` y `templatetwobe` removidos de connect-src
 - [x] `X-Frame-Options`, `X-Content-Type-Options` presentes en admin headers ✅ Phase 2
