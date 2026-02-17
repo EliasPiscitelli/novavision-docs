@@ -389,10 +389,10 @@ Verificar que todas las tablas con `client_id` tengan índice explícito — per
 ### DB Security
 - [ ] `SELECT count(*) FROM pg_tables WHERE schemaname='public' AND NOT rowsecurity` = 0 en ambas DBs
 - [ ] `SELECT * FROM pg_policies WHERE qual::text LIKE '%novavision.contact@gmail.com%'` = 0 rows en ambas DBs
-- [ ] `SELECT * FROM pg_policies WHERE tablename='order_items' AND qual::text LIKE '%client_id%'` tiene al menos 1 policy
-- [x] RLS en `auth_bridge_codes` — migración creada ✅ Phase 2 (pendiente ejecutar en Admin DB)
-- [x] RLS en `provisioning_job_steps` — migración creada ✅ Phase 2 (pendiente ejecutar en Admin DB)
-- [ ] Todas las funciones SECURITY DEFINER tienen `SET search_path = public, pg_temp`
+- [x] `SELECT * FROM pg_policies WHERE tablename='order_items' AND qual::text LIKE '%client_id%'` tiene al menos 1 policy ✅ Phase 3 — 4 policies tenant-scoped creadas (select/insert/update/delete via JOIN a orders)
+- [x] RLS en `auth_bridge_codes` — migración creada y ejecutada ✅ Phase 2
+- [x] RLS en `provisioning_job_steps` — migración creada y ejecutada ✅ Phase 2
+- [x] Todas las funciones SECURITY DEFINER tienen `SET search_path = public, pg_temp` ✅ Phase 3 — 10 funciones Backend + 15 funciones Admin corregidas
 
 ### Backend API
 - [x] `grep -r "x-client-id" src/common/helpers/client-id.helper.ts` no muestra fallback a header ✅ Phase 1
@@ -405,12 +405,14 @@ Verificar que todas las tablas con `client_id` tengan índice explícito — per
 - [x] Ngrok CORS bloqueado en producción ✅ Phase 2
 
 ### Frontend
-- [ ] `grep -r "sessionStorage.*internal_key" src/` devuelve 0 resultados (migrado a httpOnly cookie) — DIFERIDO Phase 3
+- [ ] `grep -r "sessionStorage.*internal_key" src/` devuelve 0 resultados (migrado a httpOnly cookie) — DIFERIDO (cross-origin complexity)
 - [ ] `grep -r "localStorage.*token" src/` — solo builder_token con cleanup automático
 - [x] `Content-Security-Policy` configurado en admin netlify.toml sin `unsafe-eval` ✅ Phase 2
-- [ ] `Content-Security-Policy` en web sin `unsafe-eval` — PENDIENTE Phase 3
+- [x] `Content-Security-Policy` en web endurecido ✅ Phase 3 — `unsafe-eval` mantenido (requerido por MercadoPago SDK), `localhost:3000` y `templatetwobe` removidos de connect-src
 - [x] `X-Frame-Options`, `X-Content-Type-Options` presentes en admin headers ✅ Phase 2
-- [ ] `Access-Control-Allow-Origin: *` removido de Web storefront — PENDIENTE Phase 3
+- [x] `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` añadidos a Web storefront ✅ Phase 3
+- [x] `Access-Control-Allow-Origin: *` removido de Web storefront ✅ Phase 3
+- [x] CORS headers innecesarios (Allow-Methods, Allow-Headers) removidos de Web storefront ✅ Phase 3
 
 ### Cross-tenant Validation
 - [ ] Crear usuario en Tenant A, intentar leer products de Tenant B → 0 resultados
