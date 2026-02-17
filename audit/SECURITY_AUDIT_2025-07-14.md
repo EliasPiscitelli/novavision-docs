@@ -268,11 +268,11 @@ Sin embargo, la auditoría profunda (código + DB) revela **32 hallazgos de segu
 | **Código** | Wildcard `*.ngrok*` en la lista de orígenes permitidos |
 | **Impacto** | Cualquier atacante con un túnel ngrok puede hacer requests CORS al backend. |
 
-#### H-24 · Backoff/retry de webhook no exponencial
+#### H-24 · Backoff/retry de webhook no exponencial — ✅ YA IMPLEMENTADO
 
 | Campo | Detalle |
-|-------|---------|
-| **Impacto** | Si MercadoPago reenvía webhooks rápidamente, el backend puede sobrecargarse procesando duplicados. |
+|-------|--------|
+| **Evaluación Phase 5** | Revisado en detalle: `getPaymentDetails()` YA implementa backoff exponencial (`delay = baseDelay * 2^attempt`) para errores 429/5xx/transitorios de red. Deduplicación doble capa: tabla `tenant_payment_events` (event_key SHA256) + lock in-memory (Map con TTL 120s). Idempotencia por `payment_id` en orders. No se requiere acción adicional. |
 
 #### H-25 · CASCADE DELETE en clients — ⚠️ RIESGO ACEPTABLE
 
@@ -301,9 +301,9 @@ Sin embargo, la auditoría profunda (código + DB) revela **32 hallazgos de segu
 
 ### 🔵 P3 — BAJOS (planificar)
 
-#### H-28 · Doble policy en `order_payment_breakdown`
+#### H-28 · Doble policy en `order_payment_breakdown` — ✅ RESUELTO Phase 5
 
-Admin + tenant select duplicados — sin impacto de seguridad pero crea confusión en mantenimiento.
+Eliminadas 2 políticas redundantes: `opb_select_admin` (subsumida por `opb_select_tenant`) y `server_bypass` duplicada (mantuvimos `opb_server_bypass`). Quedan 3 políticas: `opb_select_tenant`, `opb_server_bypass`, `Super Admin Bulk Access`.
 
 #### H-29 · `_headers` file en Web tiene CSP antigua — ✅ RESUELTO Phase 4
 
@@ -317,9 +317,13 @@ El archivo `public/_headers` contenía una CSP comentada con `Access-Control-All
 
 `wizard_state` contiene todo el estado del wizard de onboarding como JSON en localStorage. Si es manipulado, podría enviar datos incorrectos al backend.
 
-#### H-32 · Índices faltantes para queries frecuentes por client_id
+#### H-32 · Índices faltantes para queries frecuentes por client_id — ✅ RESUELTO Phase 5
 
-Verificar que todas las tablas con `client_id` tengan índice explícito — performance bajo carga.
+Creados 4 índices faltantes:
+- Backend DB: `idx_product_categories_client_id`
+- Admin DB: `idx_nv_onboarding_client_id`, `idx_system_events_client_id`, `idx_users_client_id`
+
+Verificación post-creación: 0 tablas con `client_id` sin índice en ambas DBs.
 
 ---
 
@@ -409,7 +413,7 @@ Verificar que todas las tablas con `client_id` tengan índice explícito — per
 
 ### Frontend
 - [ ] `grep -r "sessionStorage.*internal_key" src/` devuelve 0 resultados (migrado a httpOnly cookie) — DIFERIDO (cross-origin complexity)
-- [x] `grep -r "localStorage.*token" src/` — `usePalettes.ts` corregido a `supabase.auth.getSession()`. `IdentitySettingsTab.tsx` es código muerto. `builder_token` tiene cleanup automático en StorefrontAdminGuard. ✅ Phase 4
+- [x] `grep -r "localStorage.*token" src/` — `usePalettes.ts` corregido a `supabase.auth.getSession()`. `IdentitySettingsTab.tsx` eliminado (código muerto). `builder_token` tiene cleanup en logout (AuthContext + Step1Slug) + cleanup en Web StorefrontAdminGuard. ✅ Phase 4 + Phase 5
 - [x] `Content-Security-Policy` configurado en admin netlify.toml sin `unsafe-eval` ✅ Phase 2
 - [x] `Content-Security-Policy` en web endurecido ✅ Phase 3 — `unsafe-eval` mantenido (requerido por MercadoPago SDK), `localhost:3000` y `templatetwobe` removidos de connect-src
 - [x] `X-Frame-Options`, `X-Content-Type-Options` presentes en admin headers ✅ Phase 2
