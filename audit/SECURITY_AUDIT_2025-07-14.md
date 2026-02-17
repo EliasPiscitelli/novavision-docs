@@ -36,15 +36,16 @@ Sin embargo, la auditoría profunda (código + DB) revela **32 hallazgos de segu
 
 ### 🔴 P0 — CRÍTICOS (remediación inmediata)
 
-#### H-01 · Email hardcodeado como Super Admin en RLS — 78 tablas
+#### H-01 · Email hardcodeado como Super Admin en RLS — ~~78 tablas~~ RESUELTO ✅
 
 | Campo | Detalle |
 |-------|---------|
 | **Capa** | DB Security (Admin DB + Backend DB) |
-| **Ubicación** | 47 tablas en Admin DB + 31 tablas en Backend DB |
-| **Evidencia** | `SELECT DISTINCT tablename FROM pg_policies WHERE ... LIKE '%novavision.contact@gmail.com%'` |
-| **Impacto** | Si alguien compromete la cuenta `novavision.contact@gmail.com` en Supabase Auth, obtiene acceso TOTAL a 78 tablas en ambas bases de datos. Single Point of Failure masivo. |
-| **Remediación** | Migrar a tabla `super_admins` con función `is_super_admin()` que consulte esa tabla. Reescribir las 78 policies. |
+| **Estado** | ✅ **RESUELTO** — Phase 6 (2025-02-17) |
+| **Evidencia real** | Backend DB: 0 políticas con UUID hardcodeado (ya usaba `is_super_admin()` vía `users.role`). Admin DB: 17 políticas con UUID `a1b4ca03-...` hardcodeado. |
+| **Remediación aplicada** | **Backend DB:** Creada tabla `super_admins` + actualizada `is_super_admin()` para consultarla (antes usaba `users.role`). **Admin DB:** Reescritas 17 políticas de `auth.uid() = 'a1b4ca03-...'` → `is_super_admin()`. La función `is_super_admin()` ya existía y consulta `super_admins.email`. |
+| **Migraciones** | `migrations/backend/20250217_h01_super_admins_table.sql` + `migrations/admin/20250217_h01_rewrite_hardcoded_uuid_policies.sql` |
+| **Verificación** | 0 políticas con UUID hardcodeado en ambas DBs. 194 políticas totales en Admin (sin cambio). Agregar super admin = `INSERT INTO super_admins`. |
 
 **Tablas afectadas (Admin DB — 47):**
 `audit_log`, `client_usage_month`, `clients`, `cors_origins`, `invoices`, `mv_usage_by_client_month`, `nv_accounts`, `nv_account_dns`, `nv_account_meta`, `nv_account_meta_tags`, `nv_billing_invoices`, `nv_billing_payments`, `nv_coupons`, `nv_lead_submissions`, `nv_leads`, `nv_notification_log`, `nv_onboarding_invitations`, `nv_onboarding_logs`, `nv_onboarding_wizard`, `nv_pending_accounts`, `nv_platform_registry`, `nv_platform_settings`, `nv_referral_codes`, `nv_release_notes`, `nv_seo_ai_cache`, `nv_seo_ai_usage`, `nv_seo_ai_usage_month`, `nv_site_configs`, `nv_subscription_locks`, `nv_subscriptions`, `nv_template_ownership`, `nv_templates`, `nv_theme_snapshots`, `nv_ticket_messages`, `nv_tickets`, `payments`, `provisioning_job_steps`, `provisioning_jobs`, `provisioning_templates`, `slug_claims`, `slug_reservations`, `sync_cursors`, `template_customizations`, `users`, y más.
@@ -357,7 +358,7 @@ Verificación post-creación: 0 tablas con `client_id` sin índice en ambas DBs.
 
 | # | Acción | Hallazgo | Esfuerzo | Impacto |
 |---|--------|----------|----------|---------|
-| 1 | Crear tabla `super_admins` y función `is_super_admin()` que consulte esa tabla. Reescribir las 78 policies. | H-01 | Alto (2-3 días) | Elimina single point of failure |
+| 1 | ~~Crear tabla `super_admins` y función `is_super_admin()` que consulte esa tabla. Reescribir las 78 policies.~~ ✅ **RESUELTO** Phase 6. Backend: tabla + función creadas. Admin: 17 políticas reescritas. | H-01 | ~~Alto (2-3 días)~~ Completado | Elimina single point of failure |
 | 2 | Habilitar RLS en `auth_bridge_codes` + crear policies restrictivas | H-03 | Bajo (1h) | Cierra acceso anónimo a auth codes |
 | 3 | Agregar policy tenant-scoped a `order_items` (via JOIN a orders.client_id) | H-02 | Medio (4h) | Previene lectura cross-tenant de items |
 | 4 | Sanitizar `originalName` en `storage-path.helper.ts` | H-04 | Bajo (30min) | Elimina path traversal |
