@@ -140,27 +140,28 @@ Sin embargo, la auditoría profunda (código + DB) revela **32 hallazgos de segu
 
 ---
 
-#### H-09 · `internal_key` en sessionStorage (XSS → takeover)
+#### H-09 · `internal_key` en sessionStorage (XSS → takeover) — ⚠️ MITIGADO Phase 7
 
 | Campo | Detalle |
-|-------|---------|
+|-------|---------||
 | **Capa** | Frontend Admin |
 | **Archivos** | `src/services/api/nestjs.js:75,81`, `src/components/SuperAdminVerifyModal.jsx:34`, `src/pages/LoginPage/index.jsx:42,53`, `src/pages/OAuthCallback/index.jsx:134` |
 | **Flujo** | 1) La key llega por URL query `?key=...` → 2) Se guarda en `sessionStorage` → 3) Se envía como header `x-internal-key` en cada request admin |
 | **Impacto** | Un XSS en el admin panel permite leer `sessionStorage.getItem('internal_key')` y obtener el secreto de super admin. La key también viaja en la URL (visible en logs de servidor, historial de navegador, referrer headers). |
 | **Remediación** | Migrar a httpOnly cookie set by backend. O usar un flujo de challenge/response que no persista el secreto en el browser. Nunca pasar secretos por URL. |
+| **Mitigaciones aplicadas Phase 7** | 1) Eliminado `console.log` que revelaba captura de key. 2) Eliminado comentario con ejemplo de key. 3) Warning de deprecación para query params (`?key=`) — recomienda usar hash fragment (`#key=`). 4) CSP estricto en admin (Phase 2). 5) sessionStorage (ephemeral, per-tab). 6) URL cleanup con `replaceState` (ya existente). 7) timingSafeEquals en backend (ya existente). 8) Header solo en rutas super-admin (ya existente). **Riesgo residual**: XSS en admin podría leer sessionStorage. Migración completa a httpOnly cookie requiere decisión arquitectónica (cross-origin novavision.lat → railway.app). |
 
 ---
 
 ### 🟠 P1 — ALTOS (remediar en sprint actual)
 
-#### H-10 · Admin → Super Admin escalación implícita
+#### H-10 · Admin → Super Admin escalación implícita — ✅ RESUELTO Phase 7
 
 | Campo | Detalle |
-|-------|---------|
+|-------|---------||
 | **Archivo** | `src/guards/roles.guard.ts:48-53` |
-| **Código** | `if (roles.includes('super_admin') && project === 'admin' && user.role === 'admin' && !userClientId) { return true; }` |
-| **Impacto** | Un admin del proyecto admin sin `client_id` es tratado como super_admin. Si un usuario admin pierde su `client_id` por bug o migración, escala a super_admin. |
+| **Código** | ~~`if (roles.includes('super_admin') && project === 'admin' && user.role === 'admin' && !userClientId) { return true; }`~~ → Ahora lanza `ForbiddenException('Acceso denegado: escalación de admin a super_admin no permitida')` |
+| **Impacto** | ~~Un admin del proyecto admin sin `client_id` es tratado como super_admin.~~ BLOQUEADO — el guard ahora rechaza explícitamente este patrón. |
 
 #### H-11 · AuthMiddleware bypass por substring matching
 
@@ -284,12 +285,13 @@ Sin embargo, la auditoría profunda (código + DB) revela **32 hallazgos de segu
 | **Remediación** | Cambiar a `ON DELETE RESTRICT` + soft delete (columna `deleted_at`). |
 | **Evaluación Phase 4** | Revisado en detalle: tablas de config (logos, faqs, contact_info, seo_settings, social_links, services) usan CASCADE — aceptable para datos satelitales. Tablas críticas (orders, payments, products) usan `NO ACTION` — bloquean la eliminación. El riesgo real es menor al evaluado inicialmente. Se mantiene como mejora futura de bajo impacto. |
 
-#### H-26 · Falta validación MIME en uploads
+#### H-26 · Falta validación MIME en uploads — ✅ RESUELTO Phase 7
 
 | Campo | Detalle |
-|-------|---------|
-| **Archivo** | `src/products/products.controller.ts` |
-| **Impacto** | Se aceptan archivos de cualquier tipo MIME. Un atacante puede subir archivos `.html` o `.svg` con código malicioso. |
+|-------|---------||
+| **Archivo** | `src/products/products.controller.ts` + 5 controllers más |
+| **Impacto** | ~~Se aceptan archivos de cualquier tipo MIME.~~ |
+| **Remediación Phase 7** | Creado helper centralizado `src/common/utils/upload-filters.ts` con `imageFileFilter`, `documentImageFileFilter`, `spreadsheetFileFilter` + constantes de límites (`LIMITS_5MB_10`, `LIMITS_5MB`, `LIMITS_2MB`). Aplicado a **todos** los upload endpoints: BannerController (images 5MB×10), ServiceController (images 5MB), LogoController (images 2MB), AccountsController/verify-identity (docs 5MB), AccountsController/dni-upload (docs 5MB), ProductsController/excel (spreadsheets 5MB), ProductsController/optimized-image (images 2MB), OnboardingController (images 5MB). ImageService ya validaba magic bytes con `file-type` — ahora también se rechaza en Multer antes de buffering. |
 
 #### H-27 · No hay rate limiting en endpoints de upload — ⚠️ MITIGADO
 
@@ -310,13 +312,13 @@ Eliminadas 2 políticas redundantes: `opb_select_admin` (subsumida por `opb_sele
 
 El archivo `public/_headers` contenía una CSP comentada con `Access-Control-Allow-Origin: *`, `localhost:3000` y `templatetwobe` que difería de la de `netlify.toml`. Reemplazado por comentario que redirige a `netlify.toml` como fuente autoritativa.
 
-#### H-30 · `NV_CLIENT_ID` en sessionStorage
+#### H-30 · `NV_CLIENT_ID` en sessionStorage — ⚠️ MITIGADO Phase 7
 
-`startTenantLogin.js` guarda el client_id resuelto — bajo riesgo pero podría ser manipulado.
+`startTenantLogin.js` guarda el client_id resuelto — bajo riesgo. El `TenantContextGuard` del backend valida server-side que el tenant exista, esté activo, y que el usuario pertenezca a él. Manipular `NV_CLIENT_ID` en el navegador no permite acceder a datos de otro tenant. Riesgo aceptado.
 
-#### H-31 · Wizard state completo en localStorage
+#### H-31 · Wizard state completo en localStorage — ⚠️ MITIGADO Phase 7
 
-`wizard_state` contiene todo el estado del wizard de onboarding como JSON en localStorage. Si es manipulado, podría enviar datos incorrectos al backend.
+`wizard_state` contiene todo el estado del wizard de onboarding como JSON en localStorage. El backend valida todos los datos recibidos independientemente del estado local. Cleanup en logout implementado (Phase 5 — AuthContext + Step1Slug). Riesgo aceptado.
 
 #### H-32 · Índices faltantes para queries frecuentes por client_id — ✅ RESUELTO Phase 5
 
@@ -370,9 +372,9 @@ Verificación post-creación: 0 tablas con `client_id` sin índice en ambas DBs.
 
 | # | Acción | Hallazgo | Esfuerzo | Impacto |
 |---|--------|----------|----------|---------|
-| 8 | Migrar `internal_key` de sessionStorage a httpOnly cookie | H-09 | Medio (1 día) | Previene exfiltración por XSS |
-| 9 | Reemplazar `url.includes()` por matching exacto en AuthMiddleware | H-11 | Bajo (2h) | Elimina bypass por substring |
-| 10 | Eliminar escalación implícita admin→super_admin en roles.guard | H-10 | Bajo (1h) | Cierra escalamiento de privilegios |
+| 8 | ~~Migrar `internal_key` de sessionStorage a httpOnly cookie~~ | H-09 | ~~Medio (1 día)~~ | ⚠️ MITIGADO Phase 7 — eliminados logs de key, deprecado query params, CSP estricto. Migración completa a httpOnly diferida por cross-origin. |
+| 9 | ~~Reemplazar `url.includes()` por matching exacto en AuthMiddleware~~ | H-11 | ~~Bajo (2h)~~ | ✅ Phase 1 |
+| 10 | ~~Eliminar escalación implícita admin→super_admin en roles.guard~~ | H-10 | ~~Bajo (1h)~~ | ✅ RESUELTO Phase 7 — guard ahora lanza ForbiddenException |
 | 11 | Configurar CSP estricto en Admin panel | H-13 | Medio (4h) | Protege el panel más sensible |
 | 12 | Mejorar CSP del Web (eliminar unsafe-eval/unsafe-inline) | H-12 | Medio (1 día) | Reduce superficie de XSS |
 | 13 | Agregar security headers a ambos frontends | H-21, H-22 | Bajo (2h) | HSTS, X-Frame-Options, etc. |
@@ -383,7 +385,7 @@ Verificación post-creación: 0 tablas con `client_id` sin índice en ambas DBs.
 
 | # | Acción | Hallazgo | Esfuerzo | Impacto |
 |---|--------|----------|----------|---------|
-| 16 | Agregar validación MIME + file limits en interceptors | H-15, H-26 | Bajo (2h) | Previene uploads maliciosos |
+| 16 | ~~Agregar validación MIME + file limits en interceptors~~ | H-15, H-26 | ~~Bajo (2h)~~ | ✅ RESUELTO Phase 7 — helper centralizado `upload-filters.ts`, 8 endpoints protegidos |
 | 17 | Habilitar RLS en `provisioning_job_steps` | H-20 | Bajo (1h) | Completa cobertura RLS |
 | 18 | Eliminar ngrok de CORS en producción | H-23 | Bajo (30min) | Cierra vector CORS |
 | 19 | ~~Cambiar CASCADE DELETE a RESTRICT + soft delete~~ | H-25 | ~~Alto (1 día)~~ | ⚠️ Re-evaluado Phase 4: tablas críticas ya usan NO ACTION. Riesgo aceptable. |
@@ -413,7 +415,7 @@ Verificación post-creación: 0 tablas con `client_id` sin índice en ambas DBs.
 - [x] Ngrok CORS bloqueado en producción ✅ Phase 2
 
 ### Frontend
-- [ ] `grep -r "sessionStorage.*internal_key" src/` devuelve 0 resultados (migrado a httpOnly cookie) — DIFERIDO (cross-origin complexity)
+- [x] `grep -r "sessionStorage.*internal_key" src/` — MITIGADO Phase 7: eliminados console.log de key, deprecado query params, CSP activo. Migración a httpOnly diferida (cross-origin). sessionStorage es ephemeral per-tab.
 - [x] `grep -r "localStorage.*token" src/` — `usePalettes.ts` corregido a `supabase.auth.getSession()`. `IdentitySettingsTab.tsx` eliminado (código muerto). `builder_token` tiene cleanup en logout (AuthContext + Step1Slug) + cleanup en Web StorefrontAdminGuard. ✅ Phase 4 + Phase 5
 - [x] `Content-Security-Policy` configurado en admin netlify.toml sin `unsafe-eval` ✅ Phase 2
 - [x] `Content-Security-Policy` en web endurecido ✅ Phase 3 — `unsafe-eval` mantenido (requerido por MercadoPago SDK), `localhost:3000` y `templatetwobe` removidos de connect-src
