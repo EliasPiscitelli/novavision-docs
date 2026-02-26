@@ -195,20 +195,26 @@ El onboarding de NovaVision es **flexible, no lineal**. No son 12 pasos obligato
 - Si falta algo: se envía email detallado con lo que necesitamos para publicar
 - Diferencial: "tu tienda pasa por control de calidad antes de salir al mundo"
 
-**Nudges de recovery:** Hoy no están implementados como automatización. La infraestructura de emails existe y está lista para activar. Está en el plan de implementación pre-lanzamiento.
+**Nudges de recovery (implementado):** Sistema automático de emails de recuperación para onboardings abandonados. Si un usuario empieza el registro pero no completa el pago, recibe hasta 3 emails escalonados:
+  - **24 horas:** recordatorio amable con lista de features ("Dejaste tu tienda a medio camino")
+  - **48 horas:** urgencia + prueba social ("El 80% activa el mismo día")
+  - **72 horas:** última llamada ("Tu slug se va a liberar", CTA rojo)
+
+  El sistema es idempotente (nunca envía el mismo email dos veces) y configurable (se puede activar/desactivar). Objetivo: recuperar leads que se entusiasman en el onboarding pero no sacan la tarjeta.
 
 ---
 
 ## 5) Tracking y data
 
-**Estado actual (100% honesto):**
-- **GA4:** No instalado
-- **Meta Pixel:** No instalado
-- **CAPI:** No
-- **Consent banner/CMP:** No
+**Estado actual (implementado, pendiente de configurar IDs/tokens en producción):**
+- **GA4:** ✅ Instalado en la landing/admin (`novavision.lat`). Carga diferida — solo se activa si el usuario acepta cookies. Falta: crear la propiedad en Google Analytics y configurar el Measurement ID.
+- **Meta Pixel:** ✅ Instalado en la landing/admin. Mismo comportamiento consent-aware. Falta: confirmar/crear Pixel ID en Meta Business Manager.
+- **CAPI (Conversions API server-side):** ✅ Implementado en el backend. Envía eventos `Subscribe` (nuevo cliente paga) y `Purchase` (renovación de suscripción) directamente a Meta desde el servidor, con hashing SHA256 de datos personales. Permite deduplicación con el Pixel del browser para attribution precisa. Falta: generar Access Token de System User en Meta Business Manager.
+- **Consent banner/CMP:** ✅ Implementado. Banner de cookies conforme a Ley 25.326 (protección de datos personales Argentina). Aceptar/Rechazar. Si rechaza, ni GA4 ni Pixel se activan.
+- **Páginas legales:** ✅ Términos y Condiciones (`/terminos`) y Política de Privacidad (`/privacidad`) publicados. Conformes a Ley 24.240 (defensa del consumidor), Disposición 954/2025 (comercio electrónico), Ley 25.326 (datos personales). Incluyen derecho de arrepentimiento, ARCO, jurisdicción Buenos Aires.
 - **CRM externo:** No (la base tiene emails, nombres, teléfonos, plan de cada cliente — exportable)
 
-**Registro de pago:** Mercado Pago con webhooks seguros. Cuando un pago de suscripción se aprueba, se actualizan los registros. El evento "suscripción activa" se puede disparar desde ese punto.
+**Registro de pago:** Mercado Pago con webhooks seguros. Cuando un pago de suscripción se aprueba, se actualizan los registros **y se dispara automáticamente un evento CAPI a Meta** (`Subscribe` para nuevos clientes, `Purchase` para renovaciones). Esto permite attribution server-side sin depender del browser del usuario.
 
 **URLs principales:**
 - Landing: `novavision.lat`
@@ -222,7 +228,8 @@ El onboarding de NovaVision es **flexible, no lineal**. No son 12 pasos obligato
 | PageView | Landing | Remarketing + Lookalike |
 | Lead | Registro completado | CPL |
 | InitiateCheckout | Llega al paso de pago del onboarding | Medir abandono pre-pago |
-| Subscribe / Purchase | Pago de suscripción aprobado | CPA / ROAS |
+| Subscribe | Pago de suscripción nuevo (onboarding completado) | CPA / ROAS — **ya implementado via CAPI server-side** |
+| Purchase | Renovación de suscripción aprobada | Retention / LTV — **ya implementado via CAPI server-side** |
 
 **Audiencias:** se puede exportar la base de emails/teléfonos, hashear y subir como Custom Audience para Lookalikes.
 
@@ -271,7 +278,7 @@ Las decisiones de messaging, promos y creatividades las queremos trabajar con la
   - "¿Cómo cargo productos?" → le mostramos la IA + tutorial del dashboard
   - "Mi tienda no se publicó" → estado de revisión + email con lo que falta
   - "Quiero cambiar de plan" → se gestiona desde admin
-- **Recovery de onboarding incompleto:** infraestructura lista, flujos a activar pre-lanzamiento.
+- **Recovery de onboarding incompleto:** ✅ Implementado. Emails automáticos a las 24h, 48h y 72h para leads que no completaron el pago. Configurable (on/off). Idempotente (no repite emails).
 
 ---
 
@@ -335,7 +342,7 @@ Antes de cerrar, necesitamos entender cómo trabajan y qué esperamos del partne
 10. ¿Cómo manejan la fase de aprendizaje de Meta con budgets chicos? ¿Cuánto tiempo estiman para salir de learning?
 
 **Sobre tracking y medición:**
-11. ¿Nos ayudan con la implementación técnica de Pixel + CAPI + GA4 o necesitamos resolverlo nosotros antes de arrancar?
+11. Pixel + CAPI + GA4 ya están implementados en código (consent-aware). Solo falta crear las propiedades/tokens en Meta Business Manager y Google Analytics y configurar los IDs en producción. **¿Necesitan acceso a nuestro Meta Business Manager para verificar la configuración, o con los IDs/tokens les alcanza?**
 12. ¿Qué herramientas usan para reporting? ¿Tenemos acceso en tiempo real a los dashboards?
 13. ¿Cada cuánto entregan reportes y qué incluyen? (spend, CPL, CPA, activation rate, ROAS proyectado)
 
@@ -360,3 +367,198 @@ Antes de cerrar, necesitamos entender cómo trabajan y qué esperamos del partne
 3. **Evento de optimización en Meta:** ¿empezar por `Lead` (volumen rápido) o directamente por `Purchase` (menos señal pero más calidad)?
 
 Estas decisiones las queremos tomar **con la agencia**, no solos. Buscamos un partner de performance que guíe la estrategia comercial para poder enfocarnos en construir el mejor producto posible.
+
+---
+
+## 12) Respuestas a preguntas de la agencia (febrero 2026)
+
+> Preguntas enviadas por Pablo (agencia). Respuestas validadas contra el sistema real.
+
+---
+
+### 1. URLs y arquitectura del flujo
+
+Todo el onboarding (registro, configuración, selección de plan, pago) ocurre en **novavision.lat**. Es un wizard de pasos dentro de una sola experiencia. El usuario entra, se registra, configura lo que quiera y paga — todo sin salir de esa URL.
+
+Una vez que paga y la tienda se publica, su tienda vive en **[slug].novavision.lat** y su panel de administración en **[slug].novavision.lat/admin**. No hay un "app.novavision.lat" central — cada cliente tiene su subdominio propio.
+
+El slug/subdominio se asigna durante el onboarding, en el paso donde el usuario elige el nombre de su tienda. Se valida en tiempo real que no esté tomado y queda reservado desde ese momento.
+
+---
+
+### 2. Estados post-pago y publicación
+
+Hay estados diferenciados y registrables en el sistema:
+
+- **`draft`** → cuenta creada, onboarding en progreso, sin pago
+- **`awaiting_payment`** → configuró cosas pero no pagó todavía
+- **`awaiting_review`** → pagó, la tienda está pendiente de revisión
+- **`changes_requested`** → el equipo revisó y falta algo, se notificó al cliente
+- **`published`** → la tienda está live en su subdominio, accesible públicamente
+- **`suspended`** → suspendida por falta de pago, incumplimiento, etc.
+
+**¿Existe "StorePublished" como evento registrable?** Sí. El cambio de estado a `published` queda registrado con timestamp. Se puede disparar como evento de tracking.
+
+**¿Qué pasa si falta algo?** El estado pasa a `changes_requested` y el usuario recibe un email detallando qué completar. Además, puede ver el estado desde su panel admin — no se entera solo por email.
+
+---
+
+### 3. Revisión: checklist y bloqueos
+
+El checklist de revisión incluye:
+
+1. **Mercado Pago conectado** — para que la tienda pueda cobrar
+2. **Al menos algunos productos cargados** — pueden ser los generados por IA, pero tiene que haber catálogo
+3. **Datos de contacto completos** (email, teléfono)
+4. **Identidad visual mínima** — colores configurados (aunque sea lo que generó la IA)
+5. **Nombre de tienda real** — no placeholder ni "test"
+
+**Las 5 razones más frecuentes por las que no se publica en primera revisión** (hipótesis pre-lanzamiento):
+
+1. **No conectó Mercado Pago** — aunque el proceso es automático por OAuth (un click, no hay que copiar keys), el usuario puede saltear ese paso
+2. Catálogo vacío o con datos placeholder sin editar
+3. Falta información de contacto
+4. Nombre/marca genérico o placeholder ("Mi tienda", "Test")
+5. Contenido que viola los rubros prohibidos
+
+**Prioridad Growth/Enterprise:** sí, es operativa y real. Las revisiones de esos planes se procesan primero. Con volumen bajo al inicio todas se van a revisar rápido, pero la lógica de priorización ya está implementada.
+
+---
+
+### 4. Onboarding y fricción real
+
+**Confirmado:** el usuario puede pagar sin haber completado productos, logo, envíos ni Mercado Pago. El onboarding tiene múltiples pasos pero la mayoría son salteables. Lo mínimo que necesita para llegar al pago es: registro (email + contraseña), nombre de tienda y selección de plan. Todo lo demás se puede completar después o se solicita por email durante la revisión.
+
+**"Imágenes propias se cargan una vez publicada":** se refiere a que las fotos reales de productos (sacadas por el cliente) se suben desde el panel admin. Durante el onboarding la IA genera el catálogo con datos y descripciones, pero las imágenes propias se agregan después. Publicada = live en producción, no hay estado intermedio.
+
+---
+
+### 5. Dominio
+
+El subdominio **[slug].novavision.lat** es el formato estándar incluido en todos los planes.
+
+**Dominio propio (midominio.com):** es técnicamente posible. El cliente configura un CNAME en su DNS apuntando a NovaVision y nosotros generamos el certificado SSL. Lo vamos a ofrecer como feature de Growth/Enterprise. Hoy la prioridad es lanzar con subdominios y sumar dominio propio como upgrade post-lanzamiento.
+
+---
+
+### 6. Pagos con Mercado Pago: implementación técnica
+
+**Importante:** la conexión de Mercado Pago del **cliente** (para que su tienda pueda cobrar) se hace **por OAuth automático**. El usuario hace un click en "Conectar Mercado Pago" durante el onboarding, se abre MP, autoriza la app, y vuelve con el token. No tiene que copiar keys ni configurar nada manual. Es un flujo estándar de OAuth 2.0 con redirect.
+
+**Suscripción a NovaVision:** se maneja como **pago único** (mensual o anual), no como suscripción recurrente automática de MP. El cliente elige plan, paga, y cuando se acerca el vencimiento se le recuerda renovar. Esto nos da más control y evita los problemas clásicos de suscripciones automáticas de MP (rechazos silenciosos, tarjetas vencidas sin aviso).
+
+**ID para deduplicación Pixel/CAPI:** usamos el `payment_id` de Mercado Pago como identificador estable. Es único por transacción y se registra tanto en el evento del Pixel (browser) como en el CAPI (server-side), lo que permite deduplicación perfecta en Meta.
+
+**Webhooks:** sí, están activos. Cuando MP confirma un pago aprobado, el webhook lo procesa server-side, valida la firma criptográfica, actualiza el estado de la cuenta, y dispara el evento CAPI a Meta automáticamente. El webhook es idempotente (si llega duplicado, no genera problema).
+
+---
+
+### 7. Tracking: implementación y responsabilidades
+
+Todo lo técnico ya está implementado de nuestro lado:
+
+- **GA4 + Meta Pixel:** instalados en la landing/admin, con carga diferida (solo se activan si el usuario acepta cookies via el consent banner)
+- **CAPI server-side:** implementado en el backend, dispara `Subscribe` y `Purchase` automáticamente cuando se aprueba un pago
+- **Consent banner:** implementado, conforme a la ley argentina
+
+Lo que falta es configurar los IDs/tokens en producción (crear la propiedad de GA4, confirmar el Pixel ID en Meta Business Manager, generar el Access Token del CAPI). Son pasos de configuración en las plataformas de Google y Meta, no desarrollo.
+
+Si necesitan acceso a nuestro Meta Business Manager o Google Analytics para verificar que todo esté bien configurado, se los damos sin problema.
+
+---
+
+### 8. Mapa de eventos definitivo
+
+Confirmamos el mapa completo:
+
+| Evento | Pantalla/momento exacto | Datos disponibles |
+|--------|------------------------|-------------------|
+| **PageView** | Landing novavision.lat (cualquier página) | URL, referrer |
+| **CompleteRegistration** | Post-registro exitoso (email + contraseña confirmados) | método: email |
+| **InitiateCheckout** | Paso de selección de plan / pago en el wizard de onboarding | plan, billing_cycle, value (USD), currency |
+| **Subscribe** | Server-side: cuando el webhook de MP confirma el primer pago aprobado | plan, billing_cycle, value, currency, payment_id (para dedup) |
+| **PublicationRequested** | Cuando la cuenta pasa a estado `awaiting_review` (automático post-pago) | plan |
+| **StorePublished** | Cuando el equipo cambia el estado a `published` | plan, slug |
+| **SubscriptionCancelled** | Cuando se cancela la suscripción (manual o automático por no-renovación) | plan, motivo |
+
+Sí, podemos capturar plan, billing_cycle, value y currency en todos los eventos. Ya está implementado así en el CAPI y se puede agregar al Pixel browser sin problema.
+
+El evento `Subscribe` es el más importante para optimización en Meta porque es server-side (CAPI) y no depende del browser — siempre llega.
+
+---
+
+### 9. Legales y confianza
+
+Las páginas legales están implementadas con contenido completo:
+
+- **Términos y Condiciones** → `/terminos`
+- **Política de Privacidad** → `/privacidad`
+- **Derecho de arrepentimiento** incluido dentro de los TOS
+
+Ambos documentos cubren: Ley 24.240 (defensa del consumidor), Disposición 954/2025 (comercio electrónico), Ley 25.326 (protección de datos personales), derechos ARCO, jurisdicción Buenos Aires, política de cancelación (sin permanencia, cancelación inmediata sin penalidad, sin reembolso del período pagado).
+
+Si el link que vieron decía "en construcción" puede ser una versión cacheada anterior de la landing. El contenido legal ya está completo y listo para publicar.
+
+---
+
+### 10. Dashboard de métricas para el dueño de la tienda
+
+Hoy el panel admin del cliente muestra:
+
+- **Pedidos:** cantidad, estado (pendiente/pagado/enviado/entregado), listado con detalle completo
+- **Productos:** stock, activos/inactivos, variantes
+- **Ingresos:** total facturado por período
+- **Uso de plan:** órdenes consumidas vs límite del plan, almacenamiento usado
+
+No muestra fuentes/UTMs/canales (el cliente puede resolver eso con su propio GA4 si quiere).
+
+**Exportación:** el dueño de la tienda puede exportar pedidos. No hay API pública expuesta para integraciones directas todavía, pero es algo factible para Enterprise.
+
+Para la campaña de performance, lo importante: el dato de "cuántas tiendas tienen pedidos y cuánto facturan" lo tenemos nosotros internamente — podemos medir activation rate y salud de las tiendas.
+
+---
+
+### 11. Soporte y modelo self-serve
+
+El objetivo es 100% self-serve. Las llamadas son la excepción, no la regla. Se usan solo cuando:
+- Un potencial cliente Enterprise quiere hablar antes de pagar
+- Un cliente tiene un problema de pago que no se resuelve por chat
+
+Post-pago, el canal principal es email + WhatsApp. Durante la revisión de 24-48hs el cliente recibe actualizaciones por email. Si tiene dudas, escribe por WhatsApp y le respondemos en horario comercial.
+
+La idea es que el admin sea tan intuitivo (con la IA + los tutoriales guiados en cada sección) que el soporte se limite a dudas puntuales, no a acompañamiento constante.
+
+---
+
+### 12. Email y dominio
+
+No ofrecemos email asociado al dominio. NovaVision es una plataforma de e-commerce, no un proveedor de email. El cliente usa su email propio (Gmail, Outlook, lo que tenga).
+
+Si en algún momento ofrecemos dominios propios, podríamos recomendar Google Workspace o similar, pero no lo incluimos en el servicio.
+
+---
+
+### 13. Control y enforcement
+
+La detección de rubros prohibidos funciona en varias capas:
+
+1. **En el onboarding:** la IA analiza la descripción del negocio cuando genera el catálogo. Si detecta algo claramente prohibido, lo marca.
+2. **En la revisión manual (24-48hs):** el equipo NovaVision revisa cada tienda antes de publicar. Si el catálogo tiene productos prohibidos, no se publica y se notifica al cliente por email con el motivo.
+3. **Post-publicación:** por reportes de usuarios o revisión periódica.
+
+**Proceso de baja/takedown:** si se detecta contenido prohibido post-publicación, la tienda se suspende inmediatamente y se notifica al cliente por email con el motivo. Si es un error (no era intencional), puede corregir y solicitar re-activación. Si es intencional o reincidente, baja definitiva.
+
+**Validación mínima al vendedor:** email verificado + datos de contacto + pago aprobado. No pedimos CUIT, DNI ni documentación legal al inicio — eso lo hacemos liviano para no sumar fricción. Si detectamos comportamiento sospechoso post-publicación, podemos solicitar documentación adicional.
+
+---
+
+### 14. Oferta de lanzamiento
+
+Estamos abiertos a cualquiera de las opciones. La infraestructura soporta todas:
+
+- **Primer mes bonificado** (gratis)
+- **% de descuento por X meses**
+- **Plan anual con descuento** (hoy ya tiene ~2 meses de ahorro)
+- **Códigos promo por cupos o por fecha**
+
+No tenemos preferencia fuerte — queremos que la agencia recomiende qué funciona mejor para un SaaS de suscripción en Argentina con este budget. Si es "primer mes gratis" para bajar el CPA de activación, lo activamos en minutos. Cupos y fecha límite los definimos juntos. La idea es que la promo genere urgencia sin regalar tanto que no sea sostenible.
