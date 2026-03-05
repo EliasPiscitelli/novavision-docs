@@ -1,0 +1,408 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "initialMessages": "Hola soy el Asistente Virtual de NovaVision",
+        "options": {
+          "allowedOrigins": "https://novavision.lat",
+          "subtitle": "Este servicio funciona 24/7",
+          "title": "NovaVision Chat",
+          "customCss": ":root {\n  /* Colors NovaVision */\n  --chat--color-primary: #16b0f8;\n  --chat--color-primary-shade-50: #109dd8;\n  --chat--color-primary-shade-100: #0677a5;\n  --chat--color-secondary: #25d366;\n  --chat--color-secondary-shade-50: #1aaf50;\n  --chat--color-white: #ffffff;\n  --chat--color-light: #151d24;\n  --chat--color-light-shade-50: #101820;\n  --chat--color-light-shade-100: #28374a;\n  --chat--color-medium: #222c35;\n  --chat--color-dark: #121d27;\n  --chat--color-disabled: #666f77;\n  --chat--color-typing: #34e1eb;\n\n  /* Base Layout */\n  --chat--spacing: 1.15rem;\n  --chat--border-radius: 1.5rem;\n  --chat--transition-duration: 0.22s;\n  --chat--font-family: \"Inter\", \"Segoe UI\", \"Roboto\", Arial, sans-serif;\n\n  /* Window */\n  --chat--window--width: 420px;\n  --chat--window--height: 680px;\n  --chat--window--bottom: 2.4rem;\n  --chat--window--right: 2.4rem;\n  --chat--window--z-index: 9999;\n  --chat--window--border: 1px solid rgba(40,55,74,0.6);\n  --chat--window--border-radius: 1.6rem;\n  --chat--window--margin-bottom: var(--chat--spacing);\n\n  /* Header */\n  --chat--header-height: auto;\n  --chat--header--padding: 1rem 1.4rem;\n  --chat--header--background: linear-gradient(135deg, #0d1520 0%, #162232 100%);\n  --chat--header--color: #e6f7ff;\n  --chat--header--border-bottom: 1px solid rgba(22,176,248,0.15);\n  --chat--heading--font-size: 1.25rem;\n  --chat--subtitle--font-size: 0.88rem;\n  --chat--subtitle--line-height: 1.5;\n\n  /* Messages */\n  --chat--message--font-size: 0.94rem;\n  --chat--message--padding: 0.75rem 1rem;\n  --chat--message--border-radius: 1.2rem;\n  --chat--message-line-height: 1.6;\n  --chat--message--margin-bottom: 0.5rem;\n  --chat--message--bot--background: rgba(22,176,248,0.08);\n  --chat--message--bot--color: #d0eafc;\n  --chat--message--bot--border: 1px solid rgba(22,176,248,0.12);\n  --chat--message--user--background: linear-gradient(135deg, #16b0f8 0%, #0d8fd4 100%);\n  --chat--message--user--color: #fff;\n  --chat--message--user--border: none;\n  --chat--message--pre--background: #0a1219;\n  --chat--messages-list--padding: 1.2rem 0.8rem 0.6rem 0.8rem;\n\n  /* Toggle Button */\n  --chat--toggle--size: 64px;\n  --chat--toggle--width: var(--chat--toggle--size);\n  --chat--toggle--height: var(--chat--toggle--size);\n  --chat--toggle--border-radius: 50%;\n  --chat--toggle--background: linear-gradient(135deg, #16b0f8 0%, #0d8fd4 100%);\n  --chat--toggle--hover--background: #109dd8;\n  --chat--toggle--active--background: #0677a5;\n  --chat--toggle--color: #fff;\n  box-shadow: 0 4px 24px rgba(22,176,248,0.35);\n\n  /* Input */\n  --chat--textarea--height: 44px;\n  --chat--textarea--max-height: 12rem;\n  --chat--input--font-size: 0.95rem;\n  --chat--input--border: 1.5px solid rgba(40,55,74,0.5);\n  --chat--input--border-radius: 1rem;\n  --chat--input--padding: 0.7rem 1rem;\n  --chat--input--background: rgba(16,24,32,0.8);\n  --chat--input--text-color: #f0f6ff;\n  --chat--input--line-height: 1.5;\n  --chat--input--placeholder--font-size: 0.92rem;\n  --chat--input--border-active: 1.5px solid #16b0f8;\n  --chat--input--left--panel--width: 2rem;\n\n  /* Buttons */\n  --chat--button--color: #fff;\n  --chat--button--background: #16b0f8;\n  --chat--button--padding: 0.65rem 1.2rem;\n  --chat--button--border-radius: 0.9rem;\n  --chat--button--hover--color: #fff;\n  --chat--button--hover--background: #109dd8;\n  --chat--close--button--color-hover: #16b0f8;\n\n  /* Send/File Buttons */\n  --chat--input--send--button--background: transparent;\n  --chat--input--send--button--color: #16b0f8;\n  --chat--input--send--button--background-hover: rgba(22,176,248,0.15);\n  --chat--input--send--button--color-hover: #fff;\n  --chat--input--file--button--background: transparent;\n  --chat--input--file--button--color: #16b0f8;\n  --chat--input--file--button--background-hover: rgba(22,176,248,0.1);\n  --chat--input--file--button--color-hover: #109dd8;\n  --chat--files-spacing: 0.27rem;\n\n\n  /* Input Container */\n  --chat--input--container--background: rgba(16,24,32,0.6);\n  --chat--input--container--border: 1px solid rgba(22,176,248,0.15);\n  --chat--input--container--border-radius: 1.2rem;\n  --chat--input--container--padding: 0.5rem 0.7rem;\n\n  /* Body & Footer */\n  --chat--body--background: #0d1520;\n  --chat--footer--background: rgba(18,29,39,0.95);\n  --chat--footer--color: #c5e4fb;\n}\n\n/* ── Keyframes ── */\n@keyframes nv-msg-in {\n  from { opacity: 0; transform: translateY(12px) scale(0.97); }\n  to { opacity: 1; transform: translateY(0) scale(1); }\n}\n@keyframes nv-fade-in {\n  from { opacity: 0; }\n  to { opacity: 1; }\n}\n@keyframes nv-pulse-ring {\n  0% { box-shadow: 0 0 0 0 rgba(22,176,248,0.4); }\n  70% { box-shadow: 0 0 0 8px rgba(22,176,248,0); }\n  100% { box-shadow: 0 0 0 0 rgba(22,176,248,0); }\n}\n\n/* ── Window ── */\n.chat-wrapper {\n  box-shadow: 0 16px 48px rgba(0,0,0,0.45), 0 0 0 1px rgba(22,176,248,0.08);\n  animation: nv-fade-in 0.3s ease-out;\n}\n\n/* ── Header ── */\n.chat-header {\n  border-bottom: 1px solid rgba(22,176,248,0.12) !important;\n  padding-bottom: 0.8rem;\n}\n.chat-header p {\n  opacity: 0.6;\n  font-size: 0.82rem;\n  margin-top: 0.15rem;\n  letter-spacing: 0.02em;\n}\n\n/* ── Heading with Logo ── */\n.chat-heading {\n  position: relative;\n  padding-left: 3.6rem;\n  display: flex;\n  align-items: center;\n  font-weight: 700;\n  font-size: 1.15rem;\n  letter-spacing: -0.01em;\n}\n.chat-heading h1 {\n  font-size: inherit;\n  font-weight: inherit;\n  margin: 0;\n}\n.chat-heading::before {\n  content: \"\";\n  position: absolute;\n  left: 0;\n  top: 50%;\n  transform: translateY(-50%);\n  width: 3rem;\n  height: 3rem;\n  background-image: url('https://novavision.lat/logo/logo.png');\n  background-size: contain;\n  background-repeat: no-repeat;\n  background-position: center;\n  border-radius: 0.6rem;\n  animation: nv-pulse-ring 2.5s ease-in-out infinite;\n}\n\n/* ── Messages ── */\n.chat-messages-list {\n  scroll-behavior: smooth;\n}\n.chat-messages-list::-webkit-scrollbar {\n  width: 5px;\n}\n.chat-messages-list::-webkit-scrollbar-track {\n  background: transparent;\n}\n.chat-messages-list::-webkit-scrollbar-thumb {\n  background: rgba(22,176,248,0.2);\n  border-radius: 10px;\n}\n.chat-messages-list::-webkit-scrollbar-thumb:hover {\n  background: rgba(22,176,248,0.35);\n}\n\n/* Message entrance animation */\n.chat-message {\n  animation: nv-msg-in 0.35s cubic-bezier(0.22, 0.68, 0.32, 1) both;\n  max-width: 88%;\n  word-break: break-word;\n}\n\n/* Bot bubble - tail left */\n.chat-message-from-bot .chat-message-markdown {\n  border-radius: 1.2rem 1.2rem 1.2rem 0.25rem;\n}\n\n/* User bubble - tail right */\n.chat-message-from-user .chat-message-markdown {\n  border-radius: 1.2rem 1.2rem 0.25rem 1.2rem;\n}\n\n.chat-message-markdown {\n  font-size: 0.92rem;\n  line-height: 1.65;\n}\n.chat-message-markdown a {\n  color: #5bc8ff;\n  text-decoration: underline;\n  text-underline-offset: 2px;\n  transition: color 0.15s;\n}\n.chat-message-markdown a:hover {\n  color: #fff;\n}\n.chat-message-markdown p {\n  margin: 0 0 0.4em 0;\n}\n.chat-message-markdown p:last-child {\n  margin-bottom: 0;\n}\n\n\n/* ── Input container (wrapper) ── */\n.chat-inputs {\n  background: rgba(16,24,32,0.6) !important;\n  border: 1px solid rgba(22,176,248,0.15) !important;\n  border-radius: 1.2rem !important;\n  padding: 0.5rem 0.7rem !important;\n  backdrop-filter: blur(8px);\n  -webkit-backdrop-filter: blur(8px);\n  transition: border-color 0.2s ease;\n}\n.chat-inputs:focus-within {\n  border-color: rgba(22,176,248,0.4) !important;\n  box-shadow: 0 0 0 3px rgba(22,176,248,0.08);\n}\n\n/* ── .chat-input outer wrapper ── */\n.chat-input {\n  background: transparent !important;\n  border: none !important;\n  padding: 0.6rem 0.8rem !important;\n}\n\n/* ── Input area ── */\n.chat-input textarea {\n  transition: border-color 0.2s, box-shadow 0.2s;\n}\n.chat-input textarea:focus {\n  box-shadow: 0 0 0 3px rgba(22,176,248,0.15);\n}\n.chat-input textarea::placeholder {\n  color: rgba(197,228,251,0.35);\n  font-style: italic;\n}\n\n/* Send button */\n.chat-input-send-button {\n  border-radius: 50% !important;\n  width: 38px;\n  height: 38px;\n  transition: transform 0.15s, background 0.2s, color 0.2s;\n}\n.chat-input-send-button:not(:disabled):hover {\n  transform: scale(1.1);\n}\n.chat-input-send-button:not(:disabled):active {\n  transform: scale(0.95);\n}\n\n/* ── Footer ── */\n.chat-footer {\n  border-top: 1px solid rgba(22,176,248,0.08);\n  padding-top: 0.5rem;\n}\n\n/* ── Responsive ── */\n@media (max-width: 750px) {\n  :root {\n    --chat--window--width: 98vw;\n    --chat--window--height: 95vh;\n    --chat--window--bottom: 0.5rem;\n    --chat--window--right: 0.5rem;\n    --chat--window--border-radius: 1.2rem;\n    --chat--header--padding: 0.9rem 0.7rem;\n    --chat--messages-list--padding: 1rem 0.5rem 0.5rem 0.5rem;\n  }\n}\n@media (max-width: 480px) {\n  :root {\n    --chat--window--width: 100vw;\n    --chat--window--height: 100vh;\n    --chat--window--bottom: 0;\n    --chat--window--right: 0;\n    --chat--window--border-radius: 0;\n    --chat--message--font-size: 0.91rem;\n    --chat--heading--font-size: 1.1rem;\n    --chat--subtitle--font-size: 0.85rem;\n    --chat--input--font-size: 0.95rem;\n    --chat--header--padding: 0.7rem 0.5rem;\n    --chat--toggle--size: 56px;\n  }\n}\n"
+        }
+      },
+      "id": "fddbe18f-17f6-45f9-8874-5515bd7d6728",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "position": [
+        -340,
+        200
+      ],
+      "webhookId": "8f427031-1110-4ea3-aef7-5d06ba7d5bce",
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=🎯 Rol del Asistente\nSos el Agente de Consultas de NovaVision. Tu misión es informar y asistir de manera cordial, clara y profesional.\n\n🔥 NUEVO ENFOQUE: SELF-SERVE AUTOMATIZADO\nNovaVision ahora es una plataforma SaaS 100% autogestionable. Ya no armamos las tiendas por el cliente. Ahora los usuarios se registran, usan el \"Design Studio\" interactivo, eligen templates, configuran sus preferencias y publican su tienda ellos mismos en minutos.\n\n📚 Instrucciones de Respuesta\n1. Ejecutá SIEMPRE la herramienta \"FAQsTool\" ANTES de responder dudas generales, de planes o precios.\n2. NUNCA muestres arrays, json ni el listado literal de FAQs. Respondé siempre con texto humano, resumido y útil.\n\n⚙️ DERIVACIÓN SEGÚN EL PLAN (MUY IMPORTANTE)\n• Si el usuario busca información estándar, tiene un negocio normal y encaja en los planes Starter ($20) o Growth ($60): Orientalo a que inicie él mismo la creación de su tienda. Pasale este link: https://novavision.lat/builder y explicale que el proceso es guiado y rapidísimo. NO ofrezcas videollamada para estos casos.\n• Si el usuario menciona explícitamente el plan Enterprise, requiere más de 3 tiendas, alto volumen (>1000 órdenes), SLAs específicos o infraestructura a medida: Ofrecele agendar una videollamada de asesoría personalizada a través de este link: https://calendly.com/novavision-contact/30min — Explicale que ahí puede elegir día y horario disponible, y que va a recibir confirmación automática por email.\n\nConsulta del usuario:\n`{{ $json.userMessage }}`\nFecha actual para cálculos: `{{ $now }}`"
+        }
+      },
+      "id": "ceebe913-9b20-4868-89b1-223fb5a09b94",
+      "name": "AI Agent1",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        160,
+        180
+      ],
+      "typeVersion": 1.7
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "maxTokens": 700
+        }
+      },
+      "id": "ee5a41b3-974c-436a-836c-50c157c93ec4",
+      "name": "OpenAI Chat Model1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "position": [
+        100,
+        400
+      ],
+      "typeVersion": 1.2,
+      "credentials": {
+        "openAiApi": {
+          "id": "2OjaIwTnrQ68U89v",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "d0d1e5cf-2d3e-4616-913a-73772d1808ef",
+      "name": "Window Buffer Memory1",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        240,
+        400
+      ],
+      "typeVersion": 1.3
+    },
+    {
+      "parameters": {
+        "content": "## CHATBOT AGENDA\n**Double click** \nProcesamiento de clientes validos y organizacion de videiollamadas\n"
+      },
+      "id": "75064b10-8aff-4af1-b349-f6dae30d710a",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        160,
+        0
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "Procesamiento de msj y respuestas"
+      },
+      "id": "3b71621d-704f-47ca-97e5-3d48301c9d02",
+      "name": "Sticky Note6",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -40,
+        540
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "valida disponibildiad y formatos"
+      },
+      "id": "f60ba8c1-a450-49d4-bb0c-8cc78b327f43",
+      "name": "Sticky Note7",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        480,
+        540
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "Agenda y guarda el turno \n"
+      },
+      "id": "ab4bc0df-197b-41aa-a5a9-594e44b1fa40",
+      "name": "Sticky Note8",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        740,
+        540
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "Memoria reciclaje de preguntas y respuestas"
+      },
+      "id": "0dcf49fe-388a-4bb8-b494-8e1cd28d903f",
+      "name": "Sticky Note9",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        220,
+        540
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "resource": "calendar",
+        "calendar": {
+          "__rl": true,
+          "value": "novavision.contact@gmail.com",
+          "mode": "list",
+          "cachedResultName": "novavision.contact@gmail.com"
+        },
+        "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start_Time', ``, 'string') }}",
+        "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End_Time', ``, 'string') }}",
+        "options": {}
+      },
+      "id": "bdb2020b-a73b-49ae-b8d4-f5b24871cdbd",
+      "name": "Check Availability1",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "position": [
+        380,
+        400
+      ],
+      "typeVersion": 1.3,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "qyWKJIqHbsWNkbN8",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "novavision.contact@gmail.com",
+          "mode": "list",
+          "cachedResultName": "novavision.contact@gmail.com"
+        },
+        "start": "={{ $fromAI('Start', ``, 'string') }}",
+        "end": "={{ $fromAI('End', ``, 'string') }}",
+        "useDefaultReminders": "={{ $fromAI('Use_Default_Reminders', ``, 'boolean') }}",
+        "additionalFields": {
+          "attendees": [
+            "={{ $fromAI('attendees0_Attendees', ``, 'string') }}"
+          ],
+          "conferenceDataUi": {
+            "conferenceDataValues": {
+              "conferenceSolution": "hangoutsMeet"
+            }
+          },
+          "description": "={{ $fromAI('Description', ``, 'string') }}",
+          "summary": "={{ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "id": "a7eab8eb-5054-4946-9383-b729d777fe59",
+      "name": "Creat event1",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "position": [
+        540,
+        400
+      ],
+      "typeVersion": 1.3,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "qyWKJIqHbsWNkbN8",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1dzeZJfrpEz5SbbpzB_Eo_qaQpA4U-1ftqHJKczvvhJw",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "turnos",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Nombre completo": "={{ $fromAI('Nombre_completo', ``, 'string') }}",
+            "Correo": "={{ $fromAI('Correo', ``, 'string') }}",
+            "Teléfono": "={{ $fromAI('Tel_fono', ``, 'string') }}",
+            "Día y horario": "={{ $fromAI('D_a_y_horario', ``, 'string') }}",
+            "Fecha de reserva": "={{ $fromAI('Fecha_de_reserva', ``, 'string') }}",
+            "Observaciones": "={{ $fromAI('Observaciones', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Nombre completo",
+              "displayName": "Nombre completo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Correo",
+              "displayName": "Correo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Teléfono",
+              "displayName": "Teléfono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Día y horario",
+              "displayName": "Día y horario",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Fecha de reserva",
+              "displayName": "Fecha de reserva",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Observaciones",
+              "displayName": "Observaciones",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "28ec694a-ea72-4ceb-9862-84631df9e8b7",
+      "name": "Add data1",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "position": [
+        680,
+        400
+      ],
+      "typeVersion": 4.5,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "4sWYTGtyCqs604Mk",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Devuelve informacion para poder dar una mejor respuesta sobre planes, onboarding y características técnicas",
+        "jsCode": "const faqs = [\n  // ── General ──\n  {\n    \"Pregunta\": \"¿Qué es NovaVision?\",\n    \"Respuesta\": \"NovaVision es una plataforma SaaS de e-commerce 100% autogestionable. Creás tu tienda online en minutos con nuestro Design Studio: elegís un template, personalizás colores y cargás tus productos — sin necesitar conocimientos técnicos ni intermediarios.\",\n    \"Categoría\": \"General\",\n    \"Enlace\": \"https://www.novavision.lat\"\n  },\n  {\n    \"Pregunta\": \"¿Qué diferencia a NovaVision de otras plataformas como Tiendanube o Shopify?\",\n    \"Respuesta\": \"Tres cosas principales: 1) 0% comisión por venta (solo pagás tu plan), 2) SEO con Inteligencia Artificial incluido desde Growth, y 3) onboarding 100% self-serve — tu tienda queda lista en minutos, no en días. Además tenés envíos integrados con Andreani, OCA y Correo Argentino desde el plan Growth.\",\n    \"Categoría\": \"General\",\n    \"Enlace\": \"\"\n  },\n\n  // ── Precios y Planes ──\n  {\n    \"Pregunta\": \"¿Cuánto sale NovaVision? ¿Cuáles son los planes?\",\n    \"Respuesta\": \"Tenemos 3 planes: Starter (USD 20/mes), Growth (USD 60/mes, recomendado) y Enterprise (USD 390/mes para alto volumen). Si pagás anual, te bonificamos 2 meses: Starter USD 200/año, Growth USD 600/año, Enterprise USD 3.500/año. Sin comisión por venta y sin costo de setup.\",\n    \"Categoría\": \"Precios\",\n    \"Enlace\": \"https://www.novavision.lat/precios\"\n  },\n  {\n    \"Pregunta\": \"¿Cobran comisión por venta?\",\n    \"Respuesta\": \"No, NovaVision cobra 0% de comisión por venta. Solo pagás la suscripción mensual o anual de tu plan. Las únicas comisiones son las que cobra Mercado Pago por procesar los pagos de tus clientes.\",\n    \"Categoría\": \"Precios\",\n    \"Enlace\": \"\"\n  },\n  {\n    \"Pregunta\": \"¿En qué moneda se cobra?\",\n    \"Respuesta\": \"Los precios están en dólares (USD), pero el cobro se realiza en pesos argentinos (ARS) a través de Mercado Pago, usando un tipo de cambio de referencia.\",\n    \"Categoría\": \"Precios\",\n    \"Enlace\": \"\"\n  },\n\n  // ── Plan Starter ──\n  {\n    \"Pregunta\": \"¿Qué incluye el plan Starter?\",\n    \"Respuesta\": \"El plan Starter (USD 20/mes) incluye: 1 tienda activa, productos ilimitados, hasta 150 órdenes/mes, tu subdominio en novavision.lat, logo y banners, FAQs, redes sociales, envío manual/retiro en local, y acceso al AI Import Wizard (5 productos por carga). Es ideal para emprendedores que están empezando.\",\n    \"Categoría\": \"Starter\",\n    \"Enlace\": \"\"\n  },\n\n  // ── Plan Growth ──\n  {\n    \"Pregunta\": \"¿Qué incluye el plan Growth?\",\n    \"Respuesta\": \"El plan Growth (USD 60/mes) incluye todo lo de Starter más: hasta 3 tiendas activas, 1.000 órdenes/mes, cupones de descuento, analytics, SEO con IA, envíos con Andreani/OCA/Correo Argentino, variantes de producto (talles, colores), config avanzada de pagos (cuotas, señas, simulador), soporte por tickets con SLA, AI Import Wizard (50 productos/carga), y overages para que no te bloquee si superás los límites.\",\n    \"Categoría\": \"Growth\",\n    \"Enlace\": \"\"\n  },\n\n  // ── Plan Enterprise ──\n  {\n    \"Pregunta\": \"¿Qué incluye el plan Enterprise?\",\n    \"Respuesta\": \"El plan Enterprise (USD 390/mes) es para operaciones de alto volumen. Incluye todo lo de Growth más: hasta 10 tiendas activas, 10.000 órdenes/mes, carril de procesamiento dedicado, redirects SEO 301/302, AI Import Wizard masivo (200 productos/carga), SLA contractual, soporte prioritario, overages hasta 200% sin bloqueo, y opciones de infraestructura aislada. Para este plan ofrecemos una videollamada de asesoramiento personalizado.\",\n    \"Categoría\": \"Enterprise\",\n    \"Enlace\": \"\"\n  },\n\n  // ── Onboarding ──\n  {\n    \"Pregunta\": \"¿Cómo creo mi tienda? ¿Cobran setup?\",\n    \"Respuesta\": \"¡Cero costo de setup! El proceso es 100% self-serve. Ingresás a novavision.lat/builder y seguís el wizard paso a paso: elegís tu subdominio, subís tu logo, cargás productos (podés usar IA para importarlos), elegís un template de diseño, personalizás colores, conectás tu cuenta de Mercado Pago, completás tus datos y listo — tu tienda queda configurada en minutos.\",\n    \"Categoría\": \"Onboarding\",\n    \"Enlace\": \"https://novavision.lat/builder\"\n  },\n  {\n    \"Pregunta\": \"¿Cuánto tardo en tener mi tienda online?\",\n    \"Respuesta\": \"El wizard de configuración se completa en minutos. Una vez que enviás tu tienda, pasa por una revisión rápida de nuestro equipo para verificar que todo esté en orden, y después queda publicada y lista para vender.\",\n    \"Categoría\": \"Onboarding\",\n    \"Enlace\": \"\"\n  },\n\n  // ── Diseño ──\n  {\n    \"Pregunta\": \"¿Cómo funciona el diseño? ¿Puedo cambiar los colores?\",\n    \"Respuesta\": \"Sí. Tenemos 8 templates profesionales para elegir (Classic Store, Modern Grid, Elegant Minimal, Boutique, Bold & Vibrant, entre otros) y más de 20 paletas de colores prediseñadas. En el plan Growth podés crear paletas personalizadas con tus propios colores de marca. Todo se configura desde el Design Studio, sin tocar código.\",\n    \"Categoría\": \"Diseño\",\n    \"Enlace\": \"\"\n  },\n  {\n    \"Pregunta\": \"¿Puedo cambiar el template después de crear la tienda?\",\n    \"Respuesta\": \"Sí, podés cambiar de template en cualquier momento desde el panel de administración de tu tienda sin perder tus productos ni configuraciones.\",\n    \"Categoría\": \"Diseño\",\n    \"Enlace\": \"\"\n  },\n\n  // ── Pagos ──\n  {\n    \"Pregunta\": \"¿Qué métodos de pago incluye?\",\n    \"Respuesta\": \"La plataforma tiene integración nativa con Mercado Pago. Tus clientes pueden pagar con tarjeta de crédito (hasta 24 cuotas configurables), tarjeta de débito, transferencia bancaria, y efectivo (Rapipago, Pago Fácil). Además podés configurar pagos parciales (señas), elegir quién absorbe la comisión de MP, excluir métodos específicos, y usar el simulador de cobro interactivo.\",\n    \"Categoría\": \"Pagos\",\n    \"Enlace\": \"\"\n  },\n\n  // ── Envíos ──\n  {\n    \"Pregunta\": \"¿Cómo funcionan los envíos?\",\n    \"Respuesta\": \"En todos los planes podés configurar envío manual con precios fijos por zona, retiro en local, o coordinar por WhatsApp. Desde el plan Growth tenés integración automática con Andreani, OCA y Correo Argentino: tus clientes ven la cotización en vivo al ingresar su código postal. También podés ofrecer envío gratis a partir de un monto mínimo.\",\n    \"Categoría\": \"Envíos\",\n    \"Enlace\": \"\"\n  },\n\n  // ── SEO e IA ──\n  {\n    \"Pregunta\": \"¿Qué es el SEO con Inteligencia Artificial?\",\n    \"Respuesta\": \"Desde el plan Growth tenés acceso a herramientas de SEO potenciadas con IA: auditoría SEO con puntaje, meta titles y descriptions auto-generados para cada producto y categoría, sitemap XML automático, datos estructurados (JSON-LD) para Google, y un AI SEO Autopilot que optimiza tus textos con un clic. Todo para que tu tienda aparezca mejor en los resultados de búsqueda.\",\n    \"Categoría\": \"SEO\",\n    \"Enlace\": \"\"\n  },\n\n  // ── Productos ──\n  {\n    \"Pregunta\": \"¿Puedo importar productos con Inteligencia Artificial?\",\n    \"Respuesta\": \"Sí. El AI Import Wizard te permite cargar productos de forma masiva asistido por IA. En Starter podés importar 5 por carga (1 vez al día), en Growth hasta 50 por carga (5 veces al día), y en Enterprise hasta 200 por carga (20 veces al día).\",\n    \"Categoría\": \"Productos\",\n    \"Enlace\": \"\"\n  },\n  {\n    \"Pregunta\": \"¿Puedo vender productos con variantes (talles, colores)?\",\n    \"Respuesta\": \"Sí, desde el plan Growth podés crear variantes de producto con Option Sets (talle, color, material, etc.) y además configurar guías de talles para que tus clientes elijan mejor.\",\n    \"Categoría\": \"Productos\",\n    \"Enlace\": \"\"\n  },\n\n  // ── Cupones ──\n  {\n    \"Pregunta\": \"¿Puedo crear cupones de descuento?\",\n    \"Respuesta\": \"Sí, desde el plan Growth. Podés crear cupones de porcentaje, monto fijo o envío gratis, aplicarlos a toda la tienda o a productos/categorías específicas, programar fechas de inicio y vencimiento, y limitar usos totales o por cliente.\",\n    \"Categoría\": \"Cupones\",\n    \"Enlace\": \"\"\n  },\n\n  // ── Trial y Promociones ──\n  {\n    \"Pregunta\": \"¿Tienen período de prueba o trial gratuito?\",\n    \"Respuesta\": \"No tenemos un trial gratuito por defecto, pero sí podemos ofrecer cupones promocionales con meses bonificados. Si querés probar la plataforma, consultanos por WhatsApp o email para ver si hay cupones activos disponibles.\",\n    \"Categoría\": \"Trial\",\n    \"Enlace\": \"\"\n  },\n\n  // ── Soporte ──\n  {\n    \"Pregunta\": \"¿Qué tipo de soporte ofrecen?\",\n    \"Respuesta\": \"En el plan Starter tenés soporte por email. Desde Growth accedés a un sistema de tickets con SLA, hilo de conversación y encuesta de satisfacción. En Enterprise el soporte es prioritario con tiempos de respuesta garantizados por contrato.\",\n    \"Categoría\": \"Soporte\",\n    \"Enlace\": \"\"\n  },\n\n  // ── Dominio ──\n  {\n    \"Pregunta\": \"¿Puedo usar mi propio dominio?\",\n    \"Respuesta\": \"En Starter tu tienda funciona con un subdominio gratuito (tu-tienda.novavision.lat). Desde Growth podés conectar tu propio dominio personalizado (ej: www.tutienda.com).\",\n    \"Categoría\": \"Dominio\",\n    \"Enlace\": \"\"\n  },\n\n  // ── Analytics ──\n  {\n    \"Pregunta\": \"¿Tienen analytics o reportes?\",\n    \"Respuesta\": \"Sí, desde el plan Growth tenés acceso a analytics integrados, podés conectar Google Analytics 4 (GA4) y Google Tag Manager (GTM) directamente desde el panel, sin tocar código.\",\n    \"Categoría\": \"Analytics\",\n    \"Enlace\": \"\"\n  },\n\n  // ── Contacto ──\n  {\n    \"Pregunta\": \"¿Cómo los puedo contactar?\",\n    \"Respuesta\": \"Podés escribirnos por WhatsApp al +54 9 11 3930-6801, por email a info@novavision.lat, o a través de este mismo chat. Si ya tenés una tienda activa con plan Growth o Enterprise, podés abrir un ticket de soporte desde tu panel de administración.\",\n    \"Categoría\": \"Contacto\",\n    \"Enlace\": \"\"\n  }\n];\n\nconst MAX_RESULTS = 3;\nconst queryText = query?.toLowerCase?.() || \"\";\nconst matches = faqs\n  .map(faq => {\n    let score = 0;\n    const pregunta = faq.Pregunta.toLowerCase();\n    if (pregunta.includes(queryText)) score += 10;\n    queryText.split(\" \").forEach(word => {\n      if (pregunta.includes(word)) score += 1;\n    });\n    return { ...faq, score };\n  })\n  .filter(faq => faq.score > 0)\n  .sort((a, b) => b.score - a.score)\n  .slice(0, MAX_RESULTS);\n\nif (matches.length > 0) {\n  return matches.map(({ Pregunta, Respuesta, Enlace }) => {\n    let txt = `• ${Pregunta}\\n${Respuesta}`;\n    if (Enlace && Enlace.trim() !== \"\") txt += `\\nMás info: ${Enlace}`;\n    return txt;\n  }).join('\\n\\n');\n}\n\nreturn \"No encontré información específica en mi base de datos, pero podés ver todos los detalles o empezar gratis directo en nuestra web oficial: https://www.novavision.lat\";"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        660,
+        220
+      ],
+      "id": "080e4aa7-d370-4335-9561-ef92496c0103",
+      "name": "FAQsTool1"
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory1": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Availability1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Creat event1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add data1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FAQsTool1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1b725bfb8e37124905ce403d5efa14318bde4fd213f086ee1bd7c2256fc04490"
+  }
+}

@@ -31,7 +31,7 @@
 
 ## 1. Resumen Ejecutivo
 
-NovaVision puede sostener **Starter USD 20**, **Growth USD 60** y **Enterprise desde USD 280** con márgenes sanos (~76-79% bruto) en LATAM, siempre que los planes tengan **límites explícitos (quotas)**, **enforcement gradual** y protección **anti-noisy-neighbor** (single DB + single API actuales).
+NovaVision puede sostener **Starter USD 20**, **Growth USD 60** y **Enterprise USD 390** con márgenes sanos (~76-80% bruto) en LATAM, siempre que los planes tengan **límites explícitos (quotas)**, **enforcement gradual** y protección **anti-noisy-neighbor** (single DB + single API actuales).
 
 El diseño se apoya en tres pilares:
 
@@ -75,10 +75,10 @@ El diseño se apoya en tres pilares:
 ### 2.2 Jerarquía de planes existente
 
 ```
-starter ($20/m, $200/y)  <  growth ($60/m, $600/y)  <  enterprise ($250/m, $2500/y)
+starter ($20/m, $200/y)  <  growth ($60/m, $600/y)  <  enterprise ($390/m, $3500/y)
 ```
 
-> **⚠️ DISCREPANCIA:** El documento fuente propone Enterprise desde **USD 280**. El sistema actual tiene **USD 250**. Requiere decisión del TL antes de implementar.
+> **✅ RESUELTO (2026-03-03):** Enterprise queda en **USD 390/mes** (USD 3.500/año). Precio definitivo confirmado por el TL.
 
 ### 2.3 Tabla `plans` actual (Admin DB)
 
@@ -125,7 +125,7 @@ starter ($20/m, $200/y)  <  growth ($60/m, $600/y)  <  enterprise ($250/m, $2500
 | **Trial (Free)** | USD 0 | — | 1 tienda para probar + publishing básico | 1 tienda, 30 órdenes, 20k API calls, 2 GB egress, 0.5 GB storage | 2 RPS / burst 6 / conc. 5 |
 | **Starter** | USD 20 | ARS = 20 × FX_ref | Tienda chica / validación | 1 tienda, 150 órdenes, 100k API calls, 20 GB egress, 1 GB storage | 5 RPS / burst 15 / conc. 15 |
 | **Growth** | USD 60 | ARS = 60 × FX_ref | Negocio creciendo, multi-tienda | 3 tiendas, 1.000 órdenes, 800k API calls, 100 GB egress, 10 GB storage | 20 RPS / burst 60 / conc. 60 |
-| **Enterprise** | desde USD 280 | ARS = 280 × FX_ref | PYME alto volumen + lane separado | 10 tiendas, 10.000 órdenes, 8M API calls, 500 GB egress, 200 GB storage | 60 RPS / burst 180 / conc. 180 |
+| **Enterprise** | USD 390 | ARS = 390 × FX_ref | PYME alto volumen + lane separado | 10 tiendas, 10.000 órdenes, 8M API calls, 500 GB egress, 200 GB storage | 60 RPS / burst 180 / conc. 180 |
 
 ### 3.3 Sobre FX_ref (conversión ARS)
 
@@ -170,7 +170,7 @@ starter ($20/m, $200/y)  <  growth ($60/m, $600/y)  <  enterprise ($250/m, $2500
 - Overages hasta 200% con auto-charge
 - **Add-on disponible:** Infra dedicada física (DB/servicios separados) desde ~USD 550 (custom por capacidad)
 
-> **⚠️ ASSUMPTION:** Enterprise base (USD 280) = carril separado lógico (colas, workers, límites, SLA) **dentro del stack compartido**. La infra dedicada física es add-on, no base, para preservar margen.
+> **⚠️ ASSUMPTION:** Enterprise base (USD 390) = carril separado lógico (colas, workers, límites, SLA) **dentro del stack compartido**. La infra dedicada física es add-on, no base, para preservar margen.
 
 ---
 
@@ -242,7 +242,7 @@ Donde:
 |------|--------|---------|------------|-------------|---------|-------------|-----------------|---------|--------|
 | Starter ($20) | $20 | $1.38 | $1.56 | $0.02 | $0.02 | $0.15 | $1.45 | **$4.58** | **77%** |
 | Growth ($60) | $60 | $3.54 | $7.80 | $0.21 | $0.16 | $1.00 | $1.45 | **$14.16** | **76%** |
-| Enterprise ($280) | $280 | $15.42 | $39.00 | $4.20 | $1.60 | $10.00 | $1.45 | **$71.67** | **74%** |
+| Enterprise ($390) | $390 | $21.49 | $39.00 | $4.20 | $1.60 | $10.00 | $1.45 | **$77.74** | **80%** |
 
 > El driver #1 del costo en planes chicos es el **fee del cobro**. Por eso la estrategia de cobranza (MP vs. Stripe, local vs. cross-border) importa tanto para el margen.
 
@@ -312,7 +312,7 @@ Se ofrece upgrade automático cuando:
 overage_proyectado > 60% × (precio_plan_superior - precio_plan_actual)
 ```
 
-**Ejemplo:** Growth $60 → Enterprise $280 (diff $220). Si overage proyectado > $132 → se sugiere upgrade.
+**Ejemplo:** Growth $60 → Enterprise $390 (diff $330). Si overage proyectado > $198 → se sugiere upgrade.
 
 ### 6.4 Add-on: Enterprise Dedicated (infra física aislada)
 
@@ -795,7 +795,7 @@ async function quotaCheckMiddleware(req, res, next) {
 
 | # | Decisión | Impacto | Opciones |
 |---|---------|---------|---------|
-| D1 | **Enterprise: $250 (actual) o $280 (propuesto)?** | Migración de suscripciones existentes, comunicación a clientes | A) Mantener $250. B) Subir a $280 para nuevos, grandfather $250 |
+| ~~D1~~ | **Enterprise: USD 390 (RESUELTO)** | Precio definitivo confirmado por TL (2026-03-03). Sin grandfather policy. | ✅ USD 390/mes, USD 3.500/año |
 | D2 | **FX_ref: ¿TC BNA vendedor divisa o MEP?** | Consistencia con Factura E (LATAM plan) | A) BNA vendedor (alineado con ARCA). B) MEP. C) Definir por contrato |
 | D3 | **Trial: ¿existe hoy? ¿se crea?** | UX de onboarding, churn | A) Crear Trial. B) Solo Starter con 30-day money-back |
 | D4 | **Redis: ¿ya hay instancia o hay que provisionar?** | Rate limiting per-tenant y usage tracking | Verificar Railway/infra actual |

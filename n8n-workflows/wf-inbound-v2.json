@@ -12,20 +12,28 @@
       "name": "Webhook WA Inbound",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [220, 300],
+      "position": [
+        220,
+        300
+      ],
       "webhookId": "wa-inbound-v2"
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "={\"status\":\"ok\"}",
-        "options": { "responseCode": 200 }
+        "options": {
+          "responseCode": 200
+        }
       },
       "id": "inbound-respond-ok",
       "name": "Respond 200 OK",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [440, 300]
+      "position": [
+        440,
+        300
+      ]
     },
     {
       "parameters": {
@@ -35,7 +43,10 @@
       "name": "Verify Signature",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 300]
+      "position": [
+        660,
+        300
+      ]
     },
     {
       "parameters": {
@@ -45,7 +56,10 @@
       "name": "Parse WA Message",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 300]
+      "position": [
+        880,
+        300
+      ]
     },
     {
       "parameters": {
@@ -56,7 +70,10 @@
               "id": "status-check",
               "leftValue": "={{$json.is_status_update}}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equals" }
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ]
         }
@@ -65,34 +82,30 @@
       "name": "Is Status Update?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1100, 300]
+      "position": [
+        1100,
+        300
+      ]
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_logs",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            { "name": "wamid", "value": "=eq.{{$json.wamid}}" },
-            { "name": "select", "value": "id" },
-            { "name": "limit", "value": "1" }
-          ]
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" }
-          ]
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "SELECT EXISTS(\n  SELECT 1 FROM outreach_logs\n  WHERE wamid = '{{ $node[\"Parse WA Message\"].json.wamid }}'\n  LIMIT 1\n) as is_duplicate"
       },
       "id": "inbound-check-dedup",
       "name": "Check WAMID Dedup",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1100, 100]
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1100,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
     },
     {
       "parameters": {
@@ -101,9 +114,12 @@
           "conditions": [
             {
               "id": "is-dup",
-              "leftValue": "={{Array.isArray($json) && $json.length > 0}}",
+              "leftValue": "={{$json.is_duplicate}}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equals" }
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ]
         }
@@ -112,17 +128,23 @@
       "name": "Already Processed?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1320, 100]
+      "position": [
+        1320,
+        100
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const text = ($input.first().json.text || '').toLowerCase().trim();\nconst OPT_OUT = ['stop','parar','basta','no más','no mas',\n  'cancelar suscripción','cancelar suscripcion','dejar de recibir',\n  'no me escriban','borrame','eliminarme','desuscribirme'];\n\nconst isOptOut = OPT_OUT.some(kw => text.includes(kw));\nreturn [{ json: { ...$input.first().json, is_opt_out: isOptOut } }];"
+        "jsCode": "const text = ($node['Parse WA Message'].json.text || '').toLowerCase().trim();\nconst OPT_OUT = ['stop','parar','basta','no más','no mas',\n  'cancelar suscripción','cancelar suscripcion','dejar de recibir',\n  'no me escriban','borrame','eliminarme','desuscribirme'];\n\nconst isOptOut = OPT_OUT.some(kw => text.includes(kw));\nconst parsed = $node['Parse WA Message'].json;\nreturn [{ json: { ...parsed, is_opt_out: isOptOut } }];"
       },
       "id": "inbound-check-optout",
       "name": "Check Opt-out",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1540, 200]
+      "position": [
+        1540,
+        200
+      ]
     },
     {
       "parameters": {
@@ -133,7 +155,10 @@
               "id": "is-optout",
               "leftValue": "={{$json.is_opt_out}}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equals" }
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ]
         }
@@ -142,31 +167,30 @@
       "name": "Is Opt-out?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1760, 200]
+      "position": [
+        1760,
+        200
+      ]
     },
     {
       "parameters": {
-        "method": "PATCH",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads?phone=eq.{{$json.from}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"status\": \"LOST\",\n  \"lost_at\": \"{{$now.toISO()}}\",\n  \"lost_reason\": \"opt_out\",\n  \"bot_enabled\": false,\n  \"next_followup_at\": null,\n  \"updated_at\": \"{{$now.toISO()}}\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "UPDATE outreach_leads\nSET status = 'LOST',\n    lost_at = NOW(),\n    lost_reason = 'opt_out',\n    bot_enabled = false,\n    next_followup_at = NULL,\n    updated_at = NOW()\nWHERE phone = '{{ $node[\"Check Opt-out\"].json.from }}'\nRETURNING id"
       },
       "id": "inbound-mark-lost",
       "name": "Mark Lead LOST",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1980, 100],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1980,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "onError": "stopWorkflow"
     },
     {
@@ -176,8 +200,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{$env.WHATSAPP_TOKEN}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WHATSAPP_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -189,45 +219,44 @@
       "name": "Send Opt-out Reply",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2200, 100],
+      "position": [
+        2200,
+        100
+      ],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            { "name": "phone", "value": "=eq.{{$json.from}}" },
-            { "name": "select", "value": "id,name,email,phone,company,status,conversation_stage,attempt_count,ai_state,bot_enabled,hot_lead,ai_engagement_score,account_id,onboarding_status" },
-            { "name": "limit", "value": "1" }
-          ]
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" }
-          ]
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "SELECT l.id, l.name, l.email, l.phone, l.company, l.status,\n       l.conversation_stage, l.attempt_count, l.ai_state,\n       l.bot_enabled, l.hot_lead, l.ai_engagement_score,\n       l.account_id, l.onboarding_status,\n       CASE WHEN l.id IS NOT NULL THEN true ELSE false END as lead_found\nFROM (SELECT 1) dummy\nLEFT JOIN outreach_leads l ON l.phone = '{{ $node[\"Check Opt-out\"].json.from }}'\nLIMIT 1"
       },
       "id": "inbound-find-lead",
       "name": "Find Lead by Phone",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1980, 350]
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1980,
+        350
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "const results = $input.first().json;\nconst lead = Array.isArray(results) ? results[0] : results;\nconst inboundData = $node['Check Opt-out'].json;\n\nif (lead && lead.id) {\n  return [{\n    json: {\n      lead_found: true,\n      lead: lead,\n      ...inboundData\n    }\n  }];\n} else {\n  return [{\n    json: {\n      lead_found: false,\n      lead: null,\n      ...inboundData\n    }\n  }];\n}"
+        "jsCode": "const row = $input.first().json;\nconst inboundData = $node['Check Opt-out'].json;\n\nif (row && row.lead_found === true && row.id) {\n  return [{\n    json: {\n      lead_found: true,\n      lead: row,\n      ...inboundData\n    }\n  }];\n} else {\n  return [{\n    json: {\n      lead_found: false,\n      lead: null,\n      ...inboundData\n    }\n  }];\n}"
       },
       "id": "inbound-lead-check",
       "name": "Lead Found Check",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2200, 350]
+      "position": [
+        2200,
+        350
+      ]
     },
     {
       "parameters": {
@@ -238,7 +267,10 @@
               "id": "lead-found",
               "leftValue": "={{$json.lead_found}}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equals" }
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ]
         }
@@ -247,107 +279,91 @@
       "name": "Lead Found?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [2420, 350]
+      "position": [
+        2420,
+        350
+      ]
     },
     {
       "parameters": {
-        "method": "PATCH",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads?id=eq.{{$json.lead.id}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=representation" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"status\": \"IN_CONVERSATION\",\n  \"last_channel\": \"WHATSAPP\",\n  \"last_contacted_at\": \"{{$now.toISO()}}\",\n  \"updated_at\": \"{{$now.toISO()}}\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "UPDATE outreach_leads\nSET status = 'IN_CONVERSATION',\n    last_channel = 'WHATSAPP',\n    last_contacted_at = NOW(),\n    updated_at = NOW()\nWHERE id = '{{ $json.id }}'\nRETURNING *"
       },
       "id": "inbound-update-lead",
       "name": "Update Lead IN_CONV",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [2640, 250]
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2640,
+        250
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=representation,resolution=merge-duplicates" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"name\": \"{{$json.contact_name || 'Desconocido'}}\",\n  \"phone\": \"{{$json.from}}\",\n  \"status\": \"IN_CONVERSATION\",\n  \"source\": \"INBOUND_WA\",\n  \"conversation_stage\": \"INTRO\",\n  \"last_channel\": \"WHATSAPP\",\n  \"last_contacted_at\": \"{{$now.toISO()}}\",\n  \"attempt_count\": 0,\n  \"bot_enabled\": true\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "INSERT INTO outreach_leads (name, phone, status, source, conversation_stage, last_channel, last_contacted_at, attempt_count, bot_enabled)\nVALUES (\n  '{{ $node[\"Check Opt-out\"].json.contact_name || \"Desconocido\" }}',\n  '{{ $node[\"Check Opt-out\"].json.from }}',\n  'IN_CONVERSATION', 'INBOUND_WA', 'INTRO', 'WHATSAPP',\n  NOW(), 0, true\n)\nON CONFLICT (phone) DO UPDATE SET\n  status = 'IN_CONVERSATION',\n  last_channel = 'WHATSAPP',\n  last_contacted_at = NOW(),\n  updated_at = NOW()\nRETURNING *"
       },
       "id": "inbound-create-lead",
       "name": "Create Inbound Lead",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [2640, 450]
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2640,
+        450
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_logs",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"lead_id\": {{$json.lead?.id || $json[0]?.id || 0}},\n  \"channel\": \"WHATSAPP\",\n  \"action\": \"INBOUND_MSG\",\n  \"direction\": \"INBOUND\",\n  \"wamid\": \"{{$json.wamid || $node['Check Opt-out'].json.wamid}}\",\n  \"msg_type\": \"{{$json.msg_type || $node['Check Opt-out'].json.msg_type}}\",\n  \"from_name\": \"{{$json.contact_name || $node['Check Opt-out'].json.contact_name}}\",\n  \"from_phone\": \"{{$json.from || $node['Check Opt-out'].json.from}}\",\n  \"message_text\": \"{{$json.text || $node['Check Opt-out'].json.text}}\",\n  \"processing_status\": \"processed\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "INSERT INTO outreach_logs (lead_id, channel, action, direction, wamid, msg_type, from_name, from_phone, message_text, processing_status)\nVALUES (\n  '{{ $json.id }}',\n  'WHATSAPP', 'INBOUND_MSG', 'INBOUND',\n  '{{ $node[\"Check Opt-out\"].json.wamid }}',\n  '{{ $node[\"Check Opt-out\"].json.msg_type }}',\n  '{{ $node[\"Check Opt-out\"].json.contact_name }}',\n  '{{ $node[\"Check Opt-out\"].json.from }}',\n  '{{ $node[\"Check Opt-out\"].json.text }}',\n  'processed'\n)\nRETURNING id, lead_id"
       },
       "id": "inbound-log-msg",
       "name": "Log Inbound Message",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [2860, 350],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        2860,
+        350
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "continueOnFail": true
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_logs",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            { "name": "lead_id", "value": "=eq.{{$json.lead?.id || $json[0]?.id}}" },
-            { "name": "select", "value": "direction,message_text,created_at" },
-            { "name": "order", "value": "created_at.desc" },
-            { "name": "limit", "value": "10" }
-          ]
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" }
-          ]
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "SELECT direction, message_text, created_at\nFROM outreach_logs\nWHERE lead_id = '{{ $json.lead_id }}'\nORDER BY created_at DESC\nLIMIT 10"
       },
       "id": "inbound-get-history",
       "name": "Get Conversation History",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [3080, 350]
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3080,
+        350
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
     },
     {
       "parameters": {
@@ -357,88 +373,70 @@
       "name": "Check Config Cache",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3300, 350]
+      "position": [
+        3300,
+        350
+      ]
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/nv_playbook",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            { "name": "active", "value": "eq.true" },
-            { "name": "select", "value": "key,segment,stage,type,title,content,priority,topic" },
-            { "name": "order", "value": "priority.asc" }
-          ]
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" }
-          ]
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "SELECT key, segment, stage, type, title, content, priority, topic\nFROM nv_playbook\nWHERE active = true\nORDER BY priority ASC"
       },
       "id": "inbound-get-playbook",
       "name": "Get NV Playbook",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [3520, 250]
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3520,
+        250
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_config",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            { "name": "key", "value": "=in.(coupon_enabled,coupon_offer_stage,coupon_default_code,coupon_offer_message)" },
-            { "name": "select", "value": "key,value" }
-          ]
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" }
-          ]
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "SELECT key, value\nFROM outreach_config\nWHERE key IN ('coupon_enabled', 'coupon_offer_stage', 'coupon_default_code', 'coupon_offer_message')"
       },
       "id": "inbound-fetch-coupon-config",
       "name": "Fetch Coupon Config",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [3740, 250]
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3740,
+        250
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_coupons",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            { "name": "active", "value": "eq.true" },
-            { "name": "select", "value": "id,code,description,discount_type,discount_value,valid_until,max_uses,current_uses" },
-            { "name": "order", "value": "created_at.asc" },
-            { "name": "limit", "value": "5" }
-          ]
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" }
-          ]
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "SELECT id, code, description, discount_type, discount_value, valid_until, max_uses, current_uses\nFROM outreach_coupons\nWHERE active = true\nORDER BY created_at ASC\nLIMIT 5"
       },
       "id": "inbound-fetch-active-coupons",
       "name": "Fetch Active Coupons",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [3960, 250]
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        3960,
+        250
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
     },
     {
       "parameters": {
@@ -448,7 +446,10 @@
       "name": "Build AI Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [4180, 350]
+      "position": [
+        4180,
+        350
+      ]
     },
     {
       "parameters": {
@@ -458,7 +459,10 @@
       "name": "Prepare AI Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [4400, 350]
+      "position": [
+        4400,
+        350
+      ]
     },
     {
       "parameters": {
@@ -469,7 +473,10 @@
               "id": "bot-on",
               "leftValue": "={{$json.bot_enabled}}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equals" }
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ]
         }
@@ -478,13 +485,20 @@
       "name": "Bot Enabled?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [4620, 350]
+      "position": [
+        4620,
+        350
+      ]
     },
     {
       "parameters": {
         "resource": "chat",
         "operation": "message",
-        "modelId": { "__rl": true, "value": "gpt-4.1-mini", "mode": "list" },
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list"
+        },
         "messages": {
           "values": [
             {
@@ -506,7 +520,10 @@
       "name": "AI Closer Brain",
       "type": "@n8n/n8n-nodes-langchain.openAi",
       "typeVersion": 1.8,
-      "position": [4840, 250],
+      "position": [
+        4840,
+        250
+      ],
       "credentials": {
         "openAiApi": {
           "id": "CONFIGURE_ME",
@@ -522,7 +539,10 @@
       "name": "Post-process AI",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [5060, 250]
+      "position": [
+        5060,
+        250
+      ]
     },
     {
       "parameters": {
@@ -533,7 +553,10 @@
               "id": "coupon-check",
               "leftValue": "={{$json.coupon_id != null && $json.coupon_id !== ''}}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equals" }
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ]
         }
@@ -542,55 +565,51 @@
       "name": "Coupon Offered?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [5280, 250]
+      "position": [
+        5280,
+        250
+      ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_coupon_offers",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"lead_id\": {{$json.lead_id}},\n  \"coupon_id\": \"{{$json.coupon_id}}\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "INSERT INTO outreach_coupon_offers (lead_id, coupon_id)\nVALUES (\n  '{{ $json.lead_id }}',\n  '{{ $json.coupon_id }}'\n)\nRETURNING id"
       },
       "id": "inbound-log-coupon-offer",
       "name": "Log Coupon Offer",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [5500, 150],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        5500,
+        150
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "continueOnFail": true
     },
     {
       "parameters": {
-        "method": "PATCH",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads?id=eq.{{$json.lead_id}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"ai_engagement_score\": {{$json.new_score}},\n  \"conversation_stage\": \"{{$json.new_stage || $node['Prepare AI Context'].json.conversation_stage}}\",\n  \"hot_lead\": {{$json.is_hot}},\n  \"updated_at\": \"{{$now.toISO()}}\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "UPDATE outreach_leads\nSET ai_engagement_score = {{ $json.new_score }},\n    conversation_stage = '{{ $json.new_stage || $node[\"Prepare AI Context\"].json.conversation_stage }}',\n    hot_lead = {{ $json.is_hot }},\n    updated_at = NOW()\nWHERE id = '{{ $json.lead_id }}'\nRETURNING id"
       },
       "id": "inbound-update-intel",
       "name": "Update Lead Intelligence",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [5720, 250]
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        5720,
+        250
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
     },
     {
       "parameters": {
@@ -601,7 +620,10 @@
               "id": "is-hot",
               "leftValue": "={{$json.is_hot}}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equals" }
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ]
         }
@@ -610,7 +632,10 @@
       "name": "Is Hot Lead?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [5940, 250]
+      "position": [
+        5940,
+        250
+      ]
     },
     {
       "parameters": {
@@ -619,8 +644,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{$env.WHATSAPP_TOKEN}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WHATSAPP_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -632,7 +663,10 @@
       "name": "Notify Sales (Hot Lead)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [6160, 150],
+      "position": [
+        6160,
+        150
+      ],
       "continueOnFail": true
     },
     {
@@ -643,7 +677,10 @@
       "name": "Humanize Delay",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [6380, 250]
+      "position": [
+        6380,
+        250
+      ]
     },
     {
       "parameters": {
@@ -652,8 +689,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{$env.WHATSAPP_TOKEN}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WHATSAPP_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -665,156 +708,434 @@
       "name": "Send WA Reply",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [6600, 250],
+      "position": [
+        6600,
+        250
+      ],
       "onError": "continueErrorOutput"
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_logs",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"lead_id\": {{$json.lead_id || $node['Post-process AI'].json.lead_id}},\n  \"channel\": \"WHATSAPP\",\n  \"action\": \"BOT_REPLY\",\n  \"direction\": \"BOT\",\n  \"wamid\": \"{{$json.messages ? $json.messages[0].id : null}}\",\n  \"message_text\": \"{{$node['Post-process AI'].json.reply}}\",\n  \"ai_state\": {{JSON.stringify({ intent: $node['Post-process AI'].json.intent, score: $node['Post-process AI'].json.new_score, stage: $node['Post-process AI'].json.new_stage, reasoning: $node['Post-process AI'].json.reasoning, coupon_offered: $node['Post-process AI'].json.coupon_code_offered })}},\n  \"processing_status\": \"processed\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "INSERT INTO outreach_logs (lead_id, channel, action, direction, wamid, message_text, ai_state, processing_status)\nVALUES (\n  '{{ $node[\"Post-process AI\"].json.lead_id }}',\n  'WHATSAPP', 'BOT_REPLY', 'BOT',\n  COALESCE('{{ $json.messages[0].id }}', ''),\n  '{{ $node[\"Post-process AI\"].json.reply }}',\n  '{{ JSON.stringify({ intent: $node[\"Post-process AI\"].json.intent, score: $node[\"Post-process AI\"].json.new_score, stage: $node[\"Post-process AI\"].json.new_stage, reasoning: $node[\"Post-process AI\"].json.reasoning, coupon_offered: $node[\"Post-process AI\"].json.coupon_code_offered }) }}',\n  'processed'\n)\nRETURNING id"
       },
       "id": "inbound-log-reply",
       "name": "Log Bot Reply",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [6820, 250],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        6820,
+        250
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "continueOnFail": true
     }
   ],
   "connections": {
     "Webhook WA Inbound": {
-      "main": [[{ "node": "Respond 200 OK", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Respond 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Respond 200 OK": {
-      "main": [[{ "node": "Verify Signature", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Verify Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Verify Signature": {
-      "main": [[{ "node": "Parse WA Message", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Parse WA Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Parse WA Message": {
-      "main": [[{ "node": "Is Status Update?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Is Status Update?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Is Status Update?": {
       "main": [
         [],
-        [{ "node": "Check WAMID Dedup", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Check WAMID Dedup",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Check WAMID Dedup": {
-      "main": [[{ "node": "Already Processed?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Already Processed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Already Processed?": {
       "main": [
         [],
-        [{ "node": "Check Opt-out", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Check Opt-out",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Check Opt-out": {
-      "main": [[{ "node": "Is Opt-out?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Is Opt-out?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Is Opt-out?": {
       "main": [
-        [{ "node": "Mark Lead LOST", "type": "main", "index": 0 }],
-        [{ "node": "Find Lead by Phone", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Mark Lead LOST",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Lead by Phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Mark Lead LOST": {
-      "main": [[{ "node": "Send Opt-out Reply", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Send Opt-out Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Find Lead by Phone": {
-      "main": [[{ "node": "Lead Found Check", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Lead Found Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Lead Found Check": {
-      "main": [[{ "node": "Lead Found?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Lead Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Lead Found?": {
       "main": [
-        [{ "node": "Update Lead IN_CONV", "type": "main", "index": 0 }],
-        [{ "node": "Create Inbound Lead", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Update Lead IN_CONV",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Inbound Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Update Lead IN_CONV": {
-      "main": [[{ "node": "Log Inbound Message", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Log Inbound Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Create Inbound Lead": {
-      "main": [[{ "node": "Log Inbound Message", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Log Inbound Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Log Inbound Message": {
-      "main": [[{ "node": "Get Conversation History", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Get Conversation History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Get Conversation History": {
-      "main": [[{ "node": "Check Config Cache", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Check Config Cache",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Check Config Cache": {
-      "main": [[{ "node": "Get NV Playbook", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Get NV Playbook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Get NV Playbook": {
-      "main": [[{ "node": "Fetch Coupon Config", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Fetch Coupon Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fetch Coupon Config": {
-      "main": [[{ "node": "Fetch Active Coupons", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Fetch Active Coupons",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fetch Active Coupons": {
-      "main": [[{ "node": "Build AI Prompt", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build AI Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build AI Prompt": {
-      "main": [[{ "node": "Prepare AI Context", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Prepare AI Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Prepare AI Context": {
-      "main": [[{ "node": "Bot Enabled?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Bot Enabled?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Bot Enabled?": {
       "main": [
-        [{ "node": "AI Closer Brain", "type": "main", "index": 0 }],
+        [
+          {
+            "node": "AI Closer Brain",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "AI Closer Brain": {
-      "main": [[{ "node": "Post-process AI", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Post-process AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Post-process AI": {
-      "main": [[{ "node": "Coupon Offered?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Coupon Offered?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Coupon Offered?": {
       "main": [
-        [{ "node": "Log Coupon Offer", "type": "main", "index": 0 }],
-        [{ "node": "Update Lead Intelligence", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Log Coupon Offer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Lead Intelligence",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Log Coupon Offer": {
-      "main": [[{ "node": "Update Lead Intelligence", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Update Lead Intelligence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Update Lead Intelligence": {
-      "main": [[{ "node": "Is Hot Lead?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Is Hot Lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Is Hot Lead?": {
       "main": [
-        [{ "node": "Notify Sales (Hot Lead)", "type": "main", "index": 0 }],
-        [{ "node": "Humanize Delay", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Notify Sales (Hot Lead)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Humanize Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Notify Sales (Hot Lead)": {
-      "main": [[{ "node": "Humanize Delay", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Humanize Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Humanize Delay": {
-      "main": [[{ "node": "Send WA Reply", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Send WA Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Send WA Reply": {
       "main": [
-        [{ "node": "Log Bot Reply", "type": "main", "index": 0 }],
-        [{ "node": "Log Bot Reply", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Log Bot Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Bot Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
@@ -825,8 +1146,21 @@
     "callerPolicy": "workflowsFromSameOwner"
   },
   "staticData": null,
-  "tags": [{ "name": "outreach-v2" }, { "name": "inbound" }, { "name": "ai-closer" }, { "name": "coupons" }],
+  "tags": [
+    {
+      "name": "outreach-v2"
+    },
+    {
+      "name": "inbound"
+    },
+    {
+      "name": "ai-closer"
+    },
+    {
+      "name": "coupons"
+    }
+  ],
   "triggerCount": 1,
   "updatedAt": "2025-07-23T00:00:00.000Z",
-  "versionId": "inbound-v2-002"
+  "versionId": "inbound-v2-003-pg"
 }

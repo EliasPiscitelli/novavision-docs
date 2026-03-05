@@ -16,39 +16,30 @@
       "name": "Cron Seed Diario",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            { "name": "select", "value": "id,name,email,phone,source,category,last_channel,web,builder_url,store_slug" },
-            { "name": "status", "value": "eq.NEW" },
-            { "name": "order", "value": "created_at.asc" },
-            { "name": "limit", "value": "50" }
-          ]
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=representation" }
-          ]
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "SELECT id, name, email, phone, source, category, last_channel, web, builder_url, store_slug\nFROM outreach_leads\nWHERE status = 'NEW'\nORDER BY created_at ASC\nLIMIT 50"
       },
       "id": "seed-fetch",
       "name": "Fetch NEW Leads",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [220, 0],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "onError": "stopWorkflow"
     },
     {
@@ -60,7 +51,10 @@
       "name": "Loop Items",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -70,18 +64,27 @@
       "name": "Validate Contact",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
           "conditions": [
             {
               "id": "has-phone",
               "leftValue": "={{$json.has_valid_phone}}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equals" }
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -91,7 +94,10 @@
       "name": "Has Valid Phone?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ]
     },
     {
       "parameters": {
@@ -100,8 +106,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{$env.WHATSAPP_TOKEN}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WHATSAPP_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -113,94 +125,91 @@
       "name": "Send WA Seed",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1100, -100],
+      "position": [
+        1100,
+        -100
+      ],
       "onError": "continueErrorOutput"
     },
     {
       "parameters": {
-        "method": "PATCH",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads?id=eq.{{$json.id}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"status\": \"CONTACTED\",\n  \"last_channel\": \"WHATSAPP\",\n  \"last_contacted_at\": \"{{$now.toISO()}}\",\n  \"attempt_count\": 1,\n  \"next_followup_at\": \"{{$now.plus(3, 'days').toISO()}}\",\n  \"updated_at\": \"{{$now.toISO()}}\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "UPDATE outreach_leads\nSET status = 'CONTACTED',\n    last_channel = 'WHATSAPP',\n    last_contacted_at = NOW(),\n    attempt_count = 1,\n    next_followup_at = NOW() + INTERVAL '3 days',\n    updated_at = NOW()\nWHERE id = '{{ $node[\"Validate Contact\"].json.id }}'\nRETURNING id"
       },
       "id": "seed-update-wa-ok",
       "name": "Update Lead WA OK",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1320, -200],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1320,
+        -200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "onError": "stopWorkflow"
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_logs",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"lead_id\": {{$json.id}},\n  \"channel\": \"WHATSAPP\",\n  \"action\": \"SEED_SENT\",\n  \"direction\": \"OUTBOUND\",\n  \"attempt\": 1,\n  \"wamid\": \"{{$json.messages ? $json.messages[0].id : null}}\",\n  \"message_text\": \"[TEMPLATE] novavision_primer_contacto_qr_v1\",\n  \"processing_status\": \"processed\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "INSERT INTO outreach_logs (lead_id, channel, action, direction, attempt, wamid, message_text, processing_status)\nVALUES (\n  '{{ $node[\"Validate Contact\"].json.id }}',\n  'WHATSAPP', 'SEED_SENT', 'OUTBOUND', 1,\n  '{{ $node[\"Send WA Seed\"].json.messages[0].id }}',\n  '[TEMPLATE] novavision_primer_contacto_qr_v1',\n  'processed'\n)\nRETURNING id"
       },
       "id": "seed-log-wa-ok",
       "name": "Log WA Success",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1540, -200],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1540,
+        -200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "continueOnFail": true
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_logs",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"lead_id\": {{$json.id}},\n  \"channel\": \"WHATSAPP\",\n  \"action\": \"SEED_FAILED\",\n  \"direction\": \"OUTBOUND\",\n  \"attempt\": 1,\n  \"error_message\": \"WA send failed\",\n  \"processing_status\": \"error\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "INSERT INTO outreach_logs (lead_id, channel, action, direction, attempt, error_message, processing_status)\nVALUES (\n  '{{ $node[\"Validate Contact\"].json.id }}',\n  'WHATSAPP', 'SEED_FAILED', 'OUTBOUND', 1,\n  'WA send failed',\n  'error'\n)\nRETURNING id"
       },
       "id": "seed-log-wa-fail",
       "name": "Log WA Failure",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1320, 0],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1320,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "continueOnFail": true
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
           "conditions": [
             {
               "id": "has-email",
               "leftValue": "={{$json.has_valid_email}}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equals" }
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -210,7 +219,10 @@
       "name": "Has Valid Email?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, 200]
+      "position": [
+        880,
+        200
+      ]
     },
     {
       "parameters": {
@@ -225,7 +237,10 @@
       "name": "Send Email Seed",
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.1,
-      "position": [1100, 200],
+      "position": [
+        1100,
+        200
+      ],
       "credentials": {
         "gmailOAuth2": {
           "id": "yWIgAG6zWIonR54e",
@@ -236,140 +251,244 @@
     },
     {
       "parameters": {
-        "method": "PATCH",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads?id=eq.{{$json.id}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"status\": \"CONTACTED\",\n  \"last_channel\": \"EMAIL\",\n  \"last_contacted_at\": \"{{$now.toISO()}}\",\n  \"attempt_count\": 1,\n  \"next_followup_at\": \"{{$now.plus(3, 'days').toISO()}}\",\n  \"updated_at\": \"{{$now.toISO()}}\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "UPDATE outreach_leads\nSET status = 'CONTACTED',\n    last_channel = 'EMAIL',\n    last_contacted_at = NOW(),\n    attempt_count = 1,\n    next_followup_at = NOW() + INTERVAL '3 days',\n    updated_at = NOW()\nWHERE id = '{{ $node[\"Validate Contact\"].json.id }}'\nRETURNING id"
       },
       "id": "seed-update-email-ok",
       "name": "Update Lead Email OK",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1320, 200],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1320,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "onError": "stopWorkflow"
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_logs",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"lead_id\": {{$json.id}},\n  \"channel\": \"EMAIL\",\n  \"action\": \"SEED_SENT\",\n  \"direction\": \"OUTBOUND\",\n  \"attempt\": 1,\n  \"message_text\": \"[EMAIL] Seed intro\",\n  \"processing_status\": \"processed\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "INSERT INTO outreach_logs (lead_id, channel, action, direction, attempt, message_text, processing_status)\nVALUES (\n  '{{ $node[\"Validate Contact\"].json.id }}',\n  'EMAIL', 'SEED_SENT', 'OUTBOUND', 1,\n  '[EMAIL] Seed intro',\n  'processed'\n)\nRETURNING id"
       },
       "id": "seed-log-email-ok",
       "name": "Log Email Success",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1540, 200],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1540,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "continueOnFail": true
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_logs",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"lead_id\": {{$json.id}},\n  \"channel\": \"EMAIL\",\n  \"action\": \"SEED_FAILED\",\n  \"direction\": \"OUTBOUND\",\n  \"attempt\": 1,\n  \"error_message\": \"Email send failed\",\n  \"processing_status\": \"error\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "INSERT INTO outreach_logs (lead_id, channel, action, direction, attempt, error_message, processing_status)\nVALUES (\n  '{{ $node[\"Validate Contact\"].json.id }}',\n  'EMAIL', 'SEED_FAILED', 'OUTBOUND', 1,\n  'Email send failed',\n  'error'\n)\nRETURNING id"
       },
       "id": "seed-log-email-fail",
       "name": "Log Email Failure",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1320, 400],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1320,
+        400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "continueOnFail": true
     }
   ],
   "connections": {
     "Cron Seed Diario": {
-      "main": [[{ "node": "Fetch NEW Leads", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Fetch NEW Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fetch NEW Leads": {
-      "main": [[{ "node": "Loop Items", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Loop Items": {
       "main": [
-        [{ "node": "Validate Contact", "type": "main", "index": 0 }],
+        [
+          {
+            "node": "Validate Contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "Validate Contact": {
-      "main": [[
-        { "node": "Has Valid Phone?", "type": "main", "index": 0 },
-        { "node": "Has Valid Email?", "type": "main", "index": 0 }
-      ]]
+      "main": [
+        [
+          {
+            "node": "Has Valid Phone?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Has Valid Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Has Valid Phone?": {
       "main": [
-        [{ "node": "Send WA Seed", "type": "main", "index": 0 }],
+        [
+          {
+            "node": "Send WA Seed",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "Send WA Seed": {
       "main": [
-        [{ "node": "Update Lead WA OK", "type": "main", "index": 0 }],
-        [{ "node": "Log WA Failure", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Update Lead WA OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log WA Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Update Lead WA OK": {
-      "main": [[{ "node": "Log WA Success", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Log WA Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Log WA Success": {
-      "main": [[{ "node": "Loop Items", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Log WA Failure": {
-      "main": [[{ "node": "Loop Items", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Has Valid Email?": {
       "main": [
-        [{ "node": "Send Email Seed", "type": "main", "index": 0 }],
+        [
+          {
+            "node": "Send Email Seed",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "Send Email Seed": {
       "main": [
-        [{ "node": "Update Lead Email OK", "type": "main", "index": 0 }],
-        [{ "node": "Log Email Failure", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Update Lead Email OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Email Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Update Lead Email OK": {
-      "main": [[{ "node": "Log Email Success", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Log Email Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Log Email Success": {
-      "main": [[{ "node": "Loop Items", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Log Email Failure": {
-      "main": [[{ "node": "Loop Items", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "pinData": {},
@@ -379,8 +498,15 @@
     "callerPolicy": "workflowsFromSameOwner"
   },
   "staticData": null,
-  "tags": [{ "name": "outreach-v2" }, { "name": "seed" }],
+  "tags": [
+    {
+      "name": "outreach-v2"
+    },
+    {
+      "name": "seed"
+    }
+  ],
   "triggerCount": 1,
   "updatedAt": "2025-07-23T00:00:00.000Z",
-  "versionId": "seed-v2-001"
+  "versionId": "seed-v2-002-pg"
 }

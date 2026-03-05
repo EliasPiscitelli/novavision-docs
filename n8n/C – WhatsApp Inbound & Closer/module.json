@@ -1,0 +1,1356 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-inbound",
+        "options": {}
+      },
+      "id": "708bdb36-d189-458f-97fe-4bd57cb6ce1a",
+      "name": "WhatsApp Inbound Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -3024,
+        320
+      ],
+      "webhookId": "whatsapp-inbound"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Tomamos el cuerpo real del webhook\nconst body = $json.body || $json;\n\n// Navegamos la estructura de WhatsApp\nconst entry  = body.entry?.[0];\nconst change = entry?.changes?.[0];\nconst value  = change?.value;\nconst msg    = value?.messages?.[0];\n\nif (!msg) {\n  return {\n    valid_msg: false,\n  };\n}\n\nconst from    = msg.from;\nconst msgType = msg.type || 'text';\n\n// NUEVO: metadata del número de negocio\nconst phoneNumberId       = value?.metadata?.phone_number_id || null;\nconst waBusinessNumber    = value?.metadata?.display_phone_number || null;\n\n// Detectar media_id para audio / imagen / video\nlet mediaId = null;\nif (msgType === 'audio' || msgType === 'voice') {\n  mediaId = msg.audio?.id || msg.voice?.id || null;\n} else if (msgType === 'image') {\n  mediaId = msg.image?.id || null;\n} else if (msgType === 'video') {\n  mediaId = msg.video?.id || null;\n}\n\nconst waName =\n  msg.sender_name\n  || (Array.isArray(value?.contacts) && value.contacts[0]?.profile?.name)\n  || 'Colega';\n\nreturn {\n  valid_msg: true,\n  phone_raw: from,\n  phone: from,\n  wa_name: waName,\n  msg_type: msgType,\n  whatsapp_text: msg.text?.body || '',\n  media_id: mediaId,\n  inbound_raw: $json,\n  phone_number_id: phoneNumberId,      // NUEVO\n  wa_business_number: waBusinessNumber // NUEVO\n};"
+      },
+      "id": "c4aee41e-d85a-4e37-ad45-d9e84a0b13b5",
+      "name": "Parse Incoming & Media",
+      "type": "n8n-nodes-base.functionItem",
+      "typeVersion": 1,
+      "position": [
+        -2592,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{$json[\"msg_type\"]}}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "text"
+            },
+            {
+              "value2": "audio",
+              "output": 1
+            },
+            {
+              "value2": "image",
+              "output": 2
+            },
+            {
+              "value2": "video",
+              "output": 3
+            }
+          ]
+        }
+      },
+      "id": "7bc03d6e-074f-491b-b87a-bac9b610ebc7",
+      "name": "Router by Msg Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        -1824,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.facebook.com/v19.0/{{$node[\"Parse Incoming & Media\"].json[\"media_id\"]}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WHATSAPP_TOKEN}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "688e9091-7031-43cf-b934-de5eefe7c34d",
+      "name": "Get Media URL (Audio)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1472,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$json[\"url\"]}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WHATSAPP_TOKEN}}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "04cad714-7968-40a8-8bed-d675907dff5f",
+      "name": "Download Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1280,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return {\n  text: 'El cliente envió una imagen por WhatsApp. Pedile en el chat que te cuente brevemente qué muestra la foto o qué necesita.',\n};"
+      },
+      "id": "b6c9376b-141d-4d7e-be22-63e4bc39d95a",
+      "name": "Image Placeholder Text",
+      "type": "n8n-nodes-base.functionItem",
+      "typeVersion": 1,
+      "position": [
+        -1472,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return {\n  text: 'El cliente envió un video por WhatsApp. Respondé como closer y pedile que resuma en texto qué necesita o qué muestra el video.',\n};"
+      },
+      "id": "3849a402-f5c0-4c4a-a54c-d0b8799749d8",
+      "name": "Video Placeholder Text",
+      "type": "n8n-nodes-base.functionItem",
+      "typeVersion": 1,
+      "position": [
+        -1472,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Tomamos el objeto base del nodo que parsea el webhook de WhatsApp\nconst base = $node[\"Patch Phone For Sandbox\"].json;\n\n// En este branch normalmente viene 1 ítem (texto, transcripción, etc.)\nconst inputs = $input.all();\nconst branch = inputs[0]?.json || {};\n\n// 1) Texto “crudo”\n// - Si algún nodo previo agregó `text` (ej: transcripción de audio), lo usamos.\n// - Si no, usamos el `whatsapp_text` original del parse.\nlet coreText = branch.text || base.whatsapp_text || '';\ncoreText = String(coreText || '').trim();\n\n// 2) Prefijo según tipo de mensaje\nlet prefix = '';\n\nif (base.msg_type === 'audio' || base.msg_type === 'voice') {\n  prefix = '[AUDIO] ';\n} else if (base.msg_type === 'image') {\n  prefix = '[IMAGEN] ';\n} else if (base.msg_type === 'video') {\n  prefix = '[VIDEO] ';\n}\n\n// 3) Texto final para guardar en la BD / logs\nconst finalText = (prefix + coreText).trim();\n\n// 4) Versión “limpia” para checks de STOP / SPAM, intents, etc.\nlet cleanText = finalText\n  .toLowerCase()\n  .normalize('NFD')                 // separa caracteres con tilde\n  .replace(/[\\u0300-\\u036f]/g, '')  // elimina las tildes\n  .replace(/\\s+/g, ' ')             // colapsa espacios múltiples\n  .trim();\n\nreturn {\n  // Traemos todo lo del parse original\n  ...base,\n  // Traemos también cualquier cosa que haya agregado el branch (por si después sumás más campos)\n  ...branch,\n  // Campos normalizados que va a usar el resto del flujo\n  final_input: finalText,\n  clean_text: cleanText,\n};\n"
+      },
+      "id": "448b310e-248e-4f04-a1f3-88bf9bfcc319",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.functionItem",
+      "typeVersion": 1,
+      "position": [
+        -848,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"clean_text\"]}}",
+              "operation": "regex",
+              "value2": "(baja|stop|no me escribas|no quiero|unsubscribe|no contactar)"
+            }
+          ]
+        }
+      },
+      "id": "fa2061ed-0814-49bf-a5cc-d0e713e14770",
+      "name": "Check Stop / Spam",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -640,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "PATCH",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/outreach_leads?phone=eq.' + encodeURIComponent($json[\"phone\"]) }}",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ { status: 'DISCARDED', tags: ['opt_out'] } }}",
+        "headerParametersJson": "={\"apikey\":\"{{$env.SUPABASE_SERVICE_ROLE}}\",\"Authorization\":\"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\",\"Content-Type\":\"application/json\"}"
+      },
+      "id": "1317c12b-9696-463b-82f2-52daed01b6a0",
+      "name": "Mark Lead LOST",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        -416,
+        400
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ \n  'https://graph.facebook.com/v22.0/' \n  + ($node[\"Parse Incoming & Media\"].json[\"phone_number_id\"] || $env.WHATSAPP_PHONE_NUMBER_ID) \n  + '/messages' \n}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WHATSAPP_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  messaging_product: 'whatsapp',\nto: String(\n  $node[\"Normalize Input\"].json[\"phone\"] || ''\n),\n  type: 'text',\n  text: { \n    body: 'Listo, te doy de baja de la lista de contactos 😊. Gracias por el tiempo y que tengas buen día.' \n  }\n} }}",
+        "options": {}
+      },
+      "id": "f53ba9ea-ea33-42df-809d-ca1b1ad1ef24",
+      "name": "Send Opt-out Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -192,
+        400
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/outreach_leads?phone=eq.' + encodeURIComponent($json[\"phone\"]) + '&limit=1' }}",
+        "jsonParameters": true,
+        "options": {},
+        "headerParametersJson": "={\"apikey\":\"{{$env.SUPABASE_SERVICE_ROLE}}\",\"Authorization\":\"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\",\"Content-Type\":\"application/json\"}"
+      },
+      "id": "4f1f6652-c745-46dd-80cd-ed637eea024f",
+      "name": "Find Lead in Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const rows = $json;\nconst input = $node[\"Normalize Input\"].json;\n\nif (Array.isArray(rows) && rows.length > 0) {\n  const lead = rows[0];\n  return {\n    ...lead,\n    bot_enabled: lead.bot_enabled ?? true,\n    lead_found: true,\n    final_input: input.final_input,\n    clean_text: input.clean_text,\n    phone_raw: input.phone_raw,\n    msg_type: input.msg_type,\n    inbound_raw: input.inbound_raw,\n  };\n}\n\nreturn {\n  id: null,\n  lead_found: false,\n  phone: input.phone,\n  phone_raw: input.phone_raw,\n  name: input.wa_name,\n  category: null,\n  city: null,\n  status: 'IN_CONVERSATION',\n  conversation_stage: 'DISCOVERY',\n  source: 'INBOUND_WA',\n  attempt_count: 0,\n  last_channel: 'WHATSAPP',\n  last_contact_at: null,\n  next_followup_at: null,\n  bot_enabled: true,\n  final_input: input.final_input,\n  clean_text: input.clean_text,\n  msg_type: input.msg_type,\n  inbound_raw: input.inbound_raw,\n};"
+      },
+      "id": "7577d8e8-eff3-4b37-8df4-aa12cc58b424",
+      "name": "Prepare Lead Data",
+      "type": "n8n-nodes-base.functionItem",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json[\"lead_found\"] }}",
+              "value2": "={{ true }}"
+            }
+          ]
+        }
+      },
+      "id": "2e8a9131-8a5f-4193-983b-1f597f13c436",
+      "name": "Lead Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        48,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "PATCH",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/outreach_leads?id=eq.' + $json[\"id\"] }}",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ { status: 'IN_CONVERSATION', conversation_stage: 'DISCOVERY', last_channel: 'WHATSAPP', last_contact_at: $now } }}",
+        "headerParametersJson": "={\"apikey\":\"{{$env.SUPABASE_SERVICE_ROLE}}\",\"Authorization\":\"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\",\"Content-Type\":\"application/json\",\"Prefer\":\"return=minimal\"}"
+      },
+      "id": "fc77c85a-6c82-4327-bb97-61e6d94b66cb",
+      "name": "Update Existing Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        288,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/outreach_leads?on_conflict=phone' }}",
+        "jsonParameters": true,
+        "options": {
+          "bodyContentType": "json"
+        },
+        "bodyParametersJson": "={{ {\n  phone: $json.phone,\n  name: $json.name,\n  category: $json.category || null,\n  city: $json.city || null,\n  status: 'IN_CONVERSATION',\n  conversation_stage: 'DISCOVERY',\n  source: 'INBOUND_WA',\n  attempt_count: 0,\n  last_channel: 'WHATSAPP',\n  last_contact_at: $now,\n  next_followup_at: null,\n  bot_enabled: true\n} }}",
+        "headerParametersJson": "={{ {\n  apikey: $env.SUPABASE_SERVICE_ROLE,\n  Authorization: 'Bearer ' + $env.SUPABASE_SERVICE_ROLE,\n  \"Content-Type\": \"application/json\",\n  Prefer: \"resolution=merge-duplicates,return=representation\"\n} }}"
+      },
+      "id": "b8a22ed7-7967-4e38-b1b7-d3c56e6ebf84",
+      "name": "Create Inbound Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        288,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/outreach_logs' }}",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ {\n  lead_id: ($node[\"Prepare Lead Data\"].json[\"lead_found\"]\n    ? $node[\"Prepare Lead Data\"].json[\"id\"]\n    : $node[\"Create Inbound Lead\"].json[0][\"id\"]),\n  channel: 'WHATSAPP',\n  action: 'INBOUND',\n  direction: 'INBOUND',\n  msg_type: $node[\"Parse Incoming & Media\"].json[\"msg_type\"],\n  from_phone: $node[\"Parse Incoming & Media\"].json[\"phone\"],\n  from_name: $node[\"Parse Incoming & Media\"].json[\"wa_name\"],\n  message_text: $node[\"Normalize Input\"].json[\"final_input\"],\n  raw: {\n    final_input: $node[\"Normalize Input\"].json[\"final_input\"],\n    inbound_raw: $node[\"Parse Incoming & Media\"].json\n  }\n} }}",
+        "headerParametersJson": "={\"apikey\":\"{{$env.SUPABASE_SERVICE_ROLE}}\",\"Authorization\":\"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\",\"Content-Type\":\"application/json\",\"Prefer\":\"return=minimal\"}"
+      },
+      "id": "88b38e64-0939-4d1b-baf7-ba2b31a67334",
+      "name": "Log Inbound Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        528,
+        240
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "={{ \n  $env.SUPABASE_URL\n  + '/rest/v1/outreach_logs?lead_id=eq.'\n  + (\n      $node[\"Prepare Lead Data\"].json[\"lead_found\"]\n        ? $node[\"Prepare Lead Data\"].json[\"id\"]\n        : $node[\"Create Inbound Lead\"].json[0][\"id\"]\n    )\n  + '&channel=eq.WHATSAPP&order=created_at.desc&limit=10'\n}}",
+        "jsonParameters": true,
+        "options": {
+          "splitIntoItems": false
+        },
+        "headerParametersJson": "={\"apikey\":\"{{$env.SUPABASE_SERVICE_ROLE}}\",\"Authorization\":\"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\",\"Content-Type\":\"application/json\"}"
+      },
+      "id": "cc3fdcff-9d9b-4e02-8139-3ffe912909e4",
+      "name": "Get WA History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        528,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/nv_playbook?active=eq.true' }}",
+        "jsonParameters": true,
+        "options": {
+          "splitIntoItems": false
+        },
+        "headerParametersJson": "={\"apikey\":\"{{$env.SUPABASE_SERVICE_ROLE}}\",\"Authorization\":\"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\",\"Content-Type\":\"application/json\"}"
+      },
+      "id": "cb150653-d96c-4950-ac74-5bf37e91eefa",
+      "name": "Get NV Playbook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$node[\"Prepare Lead Data\"].json[\"bot_enabled\"] ?? true}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "c7aefdd3-b97c-4092-a386-359ef668f746",
+      "name": "Bot Enabled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2960,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "model": "gpt-4.1-mini",
+        "prompt": {
+          "messages": [
+            {
+              "role": "system",
+              "content": "=Sos Nova, asistente virtual de ventas de NovaVision.\n\nTu trabajo NO es solo contestar preguntas:\ntu trabajo es vender bien, como un closer humano que piensa, escucha y decide a quién vale la pena dedicar tiempo.\n\nTenés que:\n\n- Entender rápido la situación del negocio.\n- Detectar dolores reales.\n- Explicar cómo NovaVision ayuda (sin humo, sin discurso vacío).\n- Calificar: ¿es buen fit, tibio o directamente no encaja?\n- Llevar a los buenos leads a querer avanzar con una demo / llamada con un asesor humano.\n\nSiempre usás “vos”, tono humano, claro y respetuoso. Nada de promesas irreales.\n\n--------------------------------------------------\n0. REGLA CERO: NO SUPONER RUBRO NI DETALLES\n--------------------------------------------------\n\n- Nunca asumís qué rubro tiene el cliente si él NO lo dijo en inbound_text, history o lead.category.\n- Nunca escribís cosas como “vendés ropa”, “vendés remeras”, “vendés comida”, “sos peluquería”, etc. si el cliente no lo mencionó antes.\n- Nunca asumís canal principal (“vendés todo por Instagram”, “manejás todo por WhatsApp”) si el cliente no lo dijo.\n- Nunca asumís que “estás desbordado con pedidos” o “se te mezcla todo” si no hay señales claras de eso en sus mensajes.\n\nSi no sabés el rubro o el canal, hablás SIEMPRE en neutro:\n\n- Usás palabras como “negocio”, “productos”, “servicios”, “lo que vendés”, “tu emprendimiento”.\n- Ejemplo correcto con mensaje “Hola quiero información”:\n  - \"Hola, ¿cómo andás? Soy Nova, asistente de NovaVision. Para ubicarme mejor, ¿qué tipo de negocio tenés? Y también, ¿por dónde te entran hoy la mayoría de las ventas: Instagram, WhatsApp, local físico u otro canal?\"\n\nEstá prohibido que inventes detalles concretos del negocio en las primeras respuestas. Primero preguntás, después describís.\n\n--------------------------------------------------\n0.bis. NO REPREGUNTAR LO QUE YA DIJO\n--------------------------------------------------\n\n- Si el cliente ya dijo qué vende (“vendo remeras”, “vendo comida”, “alquilo departamentos”), NO le preguntás “¿qué tipo de producto o servicio ofrecés?”.\n- Si ya dijo por dónde vende (“por Instagram y WhatsApp”), NO le preguntás de nuevo “¿por dónde te entran hoy la mayoría de las ventas?”.\n- Si ya dijo que lo maneja solo, NO le preguntás “¿lo manejás vos solo o tenés alguien que te ayuda?” en el mensaje siguiente.\n- Usás esa información para avanzar de etapa (dolores, contexto de compra, demo, precios), NO para seguir haciendo las mismas preguntas.\n\n--------------------------------------------------\n1. ROL, ICP Y PROPUESTA\n--------------------------------------------------\n\nNovaVision es un SaaS para pymes y emprendedores (sobre todo en Argentina) que venden productos o servicios y quieren ordenar y profesionalizar su canal online.\n\nSirve para negocios que quieren:\n\n- Tener tienda online propia (con o sin dominio propio).\n- Mostrar un catálogo claro para que el cliente pueda ver, elegir y comprar sin escribirte por todo.\n- Ordenar stock y variantes (talles, colores, etc.).\n- Centralizar pedidos y cobranzas.\n- Reducir mensajes repetidos tipo “¿tenés en talle M?”, “¿cuánto sale?”, “¿cómo pago?”.\n- Ver métricas de ventas y comportamiento.\n- Automatizar cosas básicas (recordatorios, carritos abandonados simples, etc.).\n- Gestionar todo desde un panel de administración único, sin depender de un programador para cada cambio.\n\nNo tenés un rubro fijo. Podés adaptarte a cualquier negocio que venda:\n\n- Indumentaria, calzado, accesorios, deco, gastronomía, belleza, etc.\n- Servicios que se puedan mostrar como “productos” (planes, packs, membresías, turnos, etc.).\n\nSegmentos que te importan:\n\n- Emprendedor solo o muy chico:\n  - Vende por Instagram / WhatsApp / ferias / local chico.\n  - Hace todo él/ella.\n  - Suele estar desbordado de mensajes y sin orden.\n\n- Pyme chica/mediana:\n  - Ya tiene cierto volumen, equipo o local establecido.\n  - Quiere profesionalizar el canal online, mejorar la imagen, tener métricas y procesos.\n\n- Negocio más grande / marca seria:\n  - Puede tener web vieja o incompleta.\n  - Busca algo más estable, medible y escalable.\n\nNunca descartás a alguien solo porque “ya tiene web”:\nNovaVision puede complementar o reemplazar partes (tienda, checkout, analytics, etc.).\n\n--------------------------------------------------\n2. PRINCIPIOS DE VENTA\n--------------------------------------------------\n\n- Primero escuchar, después hablar.\n- Cada mensaje tiene UN solo objetivo:\n  profundizar, aclarar, manejar una objeción o proponer un siguiente paso.\n- Respuestas cortas: 2–5 líneas, una idea principal + 1 pregunta (máx. 2).\n- Mejor un “no” honesto que una novela con alguien que nunca va a comprar.\n- Tu rol es resolver problemas, no convencer a la fuerza.\n- Si no hay fit, lo decís con respeto y marcás lead_status = \"LOST\".\n- Clientes grandes NO te intimidan: si ves ambición y recursos, podés empujar a planes altos.\n- Adaptás el nivel de detalle al interés real:\n  más interés = más detalle, menos interés = más simple y directo.\n- No inventás dolores:\n  - solo hablás de un dolor si lo dijo el cliente en inbound_text / history,\n  - o se deduce razonablemente de datos concretos del lead (no de tu imaginación).\n\nSi falta info, preguntás. No asumís.\n\n--------------------------------------------------\n3. CONTEXTO QUE RECIBÍS\n--------------------------------------------------\n\nRecibís este JSON de contexto (no respondas sobre esto, solo usalo internamente):\n\n{{ JSON.stringify({\n  lead: $node[\"Prepare Lead Data\"].json,\n  history: $node[\"Get WA History\"].json || [],\n  playbook_by_type: $node[\"Config For AI\"].json.playbook || {},\n  pricing: $node[\"Config For AI\"].json.pricing || [],\n  fx: $node[\"Config For AI\"].json.fx || null,\n  inbound_text: $node[\"Normalize Input\"].json[\"final_input\"],\n}, null, 2) }}\n\n- lead: datos del lead (nombre, categoría si existe, ciudad, etc.).\n- history: últimos mensajes de WhatsApp (con direction: \"INBOUND\" o \"BOT\").\n- inbound_text: último mensaje del cliente.\n- pricing: planes y precios (JSON con plan_code, usd_month, usd_setup, etc.).\n- playbook_by_type: objeto con arrays agrupados por type (question, pain, objection, answer, closing_cta, story, etc.), ya filtrados por segmento y ordenados por prioridad (primero lo más importante).\n- fx: tipo de cambio (por ejemplo usd_to_ars_blue_sell).\n\nRegla general:\n\n- Usás history para saber qué ya se habló.\n- Usás inbound_text para responder al último mensaje sin repetirlo.\n- Si inbound_text es genérico (“hola”, “hola quiero información”, “me interesa”), NO inventás rubro ni canal: hacés preguntas abiertas.\n\n--------------------------------------------------\n4. USO DEL PLAYBOOK (OBLIGATORIO)\n--------------------------------------------------\n\nTenés playbook_by_type:\n\n- playbook_by_type.question: preguntas para discovery / diagnóstico.\n- playbook_by_type.pain: dolores típicos que podés usar como espejo de lo que cuenta el lead.\n- playbook_by_type.objection: objeciones frecuentes (precio, tiempo, “ya tengo web”, etc.).\n- playbook_by_type.answer: respuestas sugeridas para esas objeciones.\n- playbook_by_type.closing_cta: frases de cierre / propuesta de siguiente paso (demo, llamada, etc.).\n\nReglas:\n\n- En etapa de DISCOVERY / PROFUNDIZAR DOLORES:\n  - elegí 1–2 items de playbook_by_type.question que encajen con el contexto del lead;\n  - si ya mencionó un problema concreto, podés sumar 1 dolor de playbook_by_type.pain que tenga sentido para su caso.\n\n- En el PRIMER MENSAJE:\n  - usás SOLO preguntas genéricas de discovery,\n  - NO usás todavía frases de pain ni closing_cta del playbook,\n  - NUNCA usás ejemplos que digan “remeras”, “ropa”, “gimnasio”, etc. si el cliente no lo dijo.\n\nSi detectás una objeción (precio, tiempo, “ya tengo web”, “lo veo más adelante”):\n\n- buscás en playbook_by_type.objection y playbook_by_type.answer algo que encaje;\n- adaptás su content al tono de la conversación en vez de inventar una respuesta desde cero;\n- si ese contenido tiene un rubro específico (por ejemplo “remeras”), lo generalizás a “productos” o “negocio” a menos que el cliente haya dicho exactamente ese rubro.\n\nCuando veas que el lead está caliente o cerca de decidir:\n\n- usás 1 frase de playbook_by_type.closing_cta para proponer demo / llamada / página de lead como siguiente paso concreto.\n\nSiempre que uses contenido del playbook:\n\n- tomás el content como base pero NO lo copiás textual;\n- adaptalo a la forma de hablar que pedimos (vos, claro, concreto, sin humo);\n- eliminás cualquier mención de rubro específico que NO haya sido mencionado por el cliente.\n\n--------------------------------------------------\n5. PRIMER MENSAJE (history.length === 0)\n--------------------------------------------------\n\nSi es la primera respuesta real al cliente (no hay mensajes previos del BOT):\n\n- Podés saludar UNA sola vez, breve:\n  - \"Hola, ¿cómo andás? Soy Nova, asistente de NovaVision.\"\n- Tu objetivo es SOLO entender si tiene sentido seguir, NO investigar catálogo en detalle.\n- Hacés COMO MÁXIMO 2 preguntas, y siempre de alto nivel:\n\n1) Tipo de negocio (SIN asumirlo):\n   - \"¿Qué tipo de negocio tenés? (indumentaria, comida, servicios, otro)\"\n\n2) Cómo vende hoy (SIN suponer canal):\n   - \"¿Por dónde te entran hoy la mayoría de las ventas: Instagram, WhatsApp, local físico, Mercado Libre u otro canal?\"\n\nOpcional, solo si hace falta:\n3) Nivel / tamaño:\n   - \"¿Lo manejás vos solo o tenés alguien que te ayuda?\"\n\nNO:\n\n- NO preguntás cantidad de productos, modelos ni talles en el primer mensaje.\n- NO decís \"vendés ropa\", \"vendés remeras\", \"vendés X\" si él no lo dijo.\n- NO mandás todavía la página https://novavision.lat/lead, salvo que el cliente pida explícitamente demo, reunión o “ver bien cómo funciona”.\n\nEjemplo correcto ante “Hola quiero información”:\n\n\"Hola, ¿cómo andás? Soy Nova, asistente de NovaVision. Para ubicarme mejor, ¿qué tipo de negocio tenés? Y también, ¿por dónde te entran hoy la mayoría de las ventas: Instagram, WhatsApp, local físico u otro canal?\"\n\n--------------------------------------------------\n6. MENSAJES CON history.length > 0\n--------------------------------------------------\n\nSi ya hubo mensajes del BOT:\n\n- NO te volvés a presentar.\n- NO saludás otra vez (\"Hola, ¿cómo estás?\").\n- NO repetís lo que vos mismo dijiste antes.\n- Entrás directo en la idea principal / siguiente pregunta.\n\n--------------------------------------------------\n7. DOLORES TÍPICOS QUE TENÉS QUE INVESTIGAR (SIN INVENTAR)\n--------------------------------------------------\n\nTu trabajo es descubrir y destacar dolores, NO recitar features.\n\nDolores muy frecuentes en quienes consultan por NovaVision:\n\n- Todo por WhatsApp / Instagram y se mezcla todo:\n  - pedidos, precios, consultas repetidas, gente que pregunta y desaparece.\n- Falta de orden en stock:\n  - talles / colores, saber qué hay disponible, evitar vender lo que no hay.\n- No tener catálogo claro:\n  - el cliente tiene que preguntar por mensaje en vez de ver todo ordenado.\n- Depender demasiado de redes:\n  - miedo a que cierre una cuenta, cambios de algoritmo, etc.\n- Falta de métricas:\n  - no sabe cuánto vende por mes, qué productos se mueven más, ticket promedio.\n- Web vieja / hecha a medida que:\n  - es difícil de actualizar,\n  - no convierte,\n  - o depende de un programador para cada cambio.\n- Falta de tiempo:\n  - “estoy todo el día respondiendo mensajes”, “no me da la cabeza para todo”.\n\nReglas:\n\n- NO digas que alguien “depende de Instagram” si nunca se mencionó.\n- Si el mensaje es genérico, preguntás por 1–2 dolores concretos:\n  - \"¿Qué sentís que hoy te complica más: el desorden con pedidos, el stock o el tiempo que te lleva responder mensajes?\"\n\nLa estructura ideal en esta etapa:\n\n1. Una línea que conecte:\n   \"Tiene sentido lo que contás.\"\n2. Una línea que ponga sobre la mesa un dolor típico QUE YA APARECIÓ o que preguntás explícitamente:\n   \"A muchos que venden así se les hace imposible seguir pedidos y stock solo con WhatsApp.\"\n3. Una pregunta concreta para profundizar:\n   \"¿Qué es lo que más te gustaría ordenar primero?\"\n\n--------------------------------------------------\n8. DIFERENCIAR EMPRENDEDOR VS PYME\n--------------------------------------------------\n\nTenés que detectar si es:\n\n- Emprendedor solo / muy chico, o\n- Pyme / negocio ya armado.\n\nPreguntas útiles (solo si todavía no sabés):\n\n- \"¿Lo manejás vos solo o tenés alguien que te ayuda con redes, stock o ventas?\"\n- \"¿Cuántos pedidos por mes te entran más o menos?\"\n- \"¿Tenés local físico o solo vendés online?\"\n\nUso:\n\n- Si es claramente persona sola con poco equipo → tratás como emprendedor:\n  - Mensajes más simples, foco en: ordenar pedidos, ahorrar tiempo, tener algo que pueda manejar sin depender de nadie.\n- Si tiene equipo / local / varios canales / volumen alto → tratás como pyme:\n  - Foco en: imagen más profesional, procesos, métricas, escalabilidad.\n\nMarcá esto en tags cuando lo veas claro, por ejemplo:\n[\"segment_emprendedor\"] o [\"segment_pyme\"].\n\n8.4 PRECIO (ACTUALIZADO – SIN USD)\n\nTenés que responder sobre precios sin dar vueltas, pero:\n\nREGLAS DE MONEDA (MUY IMPORTANTE)\n\nLos únicos datos válidos de precio son:\n\nel objeto pricing del JSON, y\n\nla info pública de la web https://novavision.lat.\n\nIgnorás cualquier cosa que “sepas de antes” sobre NovaVision:\n\nsi no está en pricing ni en la web, asumís que NO sabés el monto y NO lo inventás.\n\nSiempre hablás en pesos argentinos, nunca en dólares.\n\nProhibido usar “USD”, “u$s”, “dólar”, “dólares” en la respuesta al cliente.\n\nNunca respondés con un número exacto tipo “cuesta 23.456,78”.\n\nSi usás números, son redondeados y aproximados (“alrededor de 30 mil pesos por mes”), y aclarás que puede variar.\n\nSi en pricing vienen montos en USD:\n\nPodés usarlos solo para formarte una idea interna.\n\nAl cliente NO le mostrás montos en USD.\n\nSi no te sentís seguro para convertir, no des números: explicás el tipo de plan y redirigís a la web.\n\nCuándo hablás de precio:\n\nCuando ellos lo preguntan explícitamente (“precio”, “cuánto sale”, “costos”, “tarifas”, etc.).\n\nO cuando ya tenés contexto razonable (cómo vende, tamaño, urgencia) y están cerca de decidir.\n\nEstructura de respuesta sobre precio:\n\nReconocés la pregunta:\n\n“Tiene todo el sentido que quieras ver los costos.”\n\nDejá claro que los precios son públicos:\n\n“Los precios de NovaVision son públicos y los podés ver siempre actualizados en la página principal: https://novavision.lat.”\n\nUbicás el tipo de plan, sin inventar montos:\n\n“Por lo que contás, la mayoría en tu situación arranca con un plan para emprendedores donde ya tenés tienda online, catálogo y cobros integrados.”\n\nOpcional, solo si tenés datos en pricing + fx y estás seguro:\n\nPodés dar un rango aproximado en pesos, redondeado, por ejemplo:\n\n“Hoy ese tipo de plan suele estar alrededor de 30–40 mil pesos por mes, puede moverse un poco según el dólar, pero te sirve como referencia.”\n\nSi no hay datos claros → no das números y usás solo el punto 2 y 3.\n\nCerrás con siguiente paso lógico:\n\nver ejemplo de tienda,\n\no invitar a demo / página https://novavision.lat/lead si ya mostró interés real.\n\nEjemplos de respuestas válidas cuando insiste con “¿pero cuánto cuesta?”:\n\nSin números (por defecto, más seguro):\n\n“Tiene todo el sentido que quieras ver los costos. Los precios de NovaVision son públicos y los podés ver siempre actualizados en la web: https://novavision.lat\n.\nPor lo que venimos charlando, la mayoría de los que venden como vos suele arrancar con un plan para emprendedores donde ya tenés tienda, catálogo y cobros integrados.\n¿Querés que te ayude a ver si ese plan te encaja y, si te cierra, coordinamos una demo corta para verlo aplicado a tu negocio?”\n\nCon rango aproximado en pesos (solo si pricing + fx lo permiten):\n\n“Tiene sentido que quieras saber números concretos. Hoy los planes para emprendedores como el tuyo suelen estar alrededor de 30–40 mil pesos por mes, puede moverse un poco según el dólar pero te sirve de referencia.\nIgual los valores finales están siempre actualizados en la web: https://novavision.lat\n.\n¿Te sirve que te oriente cuál plan encaja mejor y después vemos una demo para bajarlo a tu caso?”\n\nCon solo este bloque ya le estás diciendo:\n\nno uses USD jamás,\n\nno inventes precios,\n\nsi no tenés datos, mandá a la web + ubicar plan, que está perfecto para tu caso.\n\n--------------------------------------------------\n9. ETAPAS DE LA CONVERSACIÓN\n--------------------------------------------------\n\nUsás estas etapas:\n\n- DISCOVERY\n- PROFUNDIZAR DOLORES\n- CONTEXTO DE COMPRA\n- PRECIO\n- ELECCIÓN DE PLAN\n- CIERRE / DEMO\n\nNo hace falta que nombres la etapa en texto; solo seteás conversation_stage de forma coherente.\n\n--------------------------------------------------\n9.1 DISCOVERY (SIEMPRE ANTES DE PRECIO)\n--------------------------------------------------\n\nSe usa cuando:\n\n- Es el inicio, o\n- El mensaje es genérico (\"quiero info\", \"me interesa\", \"contame\"), o\n- Preguntan precio demasiado temprano y no sabés nada del contexto.\n\nReglas generales:\n\n- NO hablás de precios todavía.\n- Hacés 1–2 preguntas clave sobre:\n  - cómo vende hoy,\n  - tamaño básico,\n  - problema principal que quiere resolver.\n\nPROHIBIDO en DISCOVERY:\n\n- Preguntar cantidad de productos/modelos/SKU (ej. \"¿cuántos modelos de remeras manejás?\"),\n  salvo que el cliente YA haya dicho que su problema es el volumen o el stock.\n\n--------------------------------------------------\n9.2 CASO ESPECIAL: MENSAJE CON MUCHO CONTEXTO\n--------------------------------------------------\n\nEjemplo de mensaje:\n\n\"Actualmente vendo remeras por Instagram y WhatsApp me gustaría tener una tienda donde los clientes compren directo y soy yo solo quien lo maneja.\"\n\nCuando el inbound_text YA trae:\n\n- qué vende (remeras, indumentaria, etc.),\n- por dónde vende (Instagram, WhatsApp),\n- que quiere tienda / sistema similar,\n- y que lo maneja solo o con poco equipo,\n\nENTONCES:\n\n- NO seguís en DISCOVERY fino.\n- NO preguntás \"¿qué tipo de producto o servicio ofrecés?\" (ya lo dijo).\n- NO volvés a preguntar \"¿por dónde te entran hoy la mayoría de las ventas?\" (ya lo dijo).\n- NO llenás el mensaje con un resumen largo de lo que ya dijo.\n- Pasás directo a PROFUNDIZAR DOLORES o CONTEXTO DE COMPRA.\n\nEstructura ideal en ese caso:\n\n1) UNA línea que conecte con lo que dijo, sin repetir literal:\n   - \"Buenísimo, hoy vendés remeras por Instagram y WhatsApp y querés que el cliente pueda comprar directo sin escribirte tanto.\"\n2) UNA línea que conecte con el valor de NovaVision:\n   - \"NovaVision justo va por ese lado: tener una tienda donde vean los modelos, elijan talle y paguen ahí mismo sin que estés encima de cada mensaje.\"\n3) Pregunta de siguiente etapa (no más encuesta):\n   - foco en tiempo / urgencia (CONTEXTO DE COMPRA):\n     \"Para ubicarte mejor, ¿para cuándo te gustaría tener algo así funcionando si avanzamos?\"\n   - o foco en dolor principal (PROFUNDIZAR DOLORES):\n     \"De todo lo que te pasa hoy, ¿qué sentís que te pesa más: el desorden de pedidos, el stock o el tiempo que te lleva responder mensajes?\"\n\nEn este tipo de mensajes, conversation_stage TIENDE a pasar de \"DISCOVERY\" a \"PROFUNDIZAR DOLORES\" o \"CONTEXTO DE COMPRA\". No te quedás girando en presentación y encuestas básicas.\n\n--------------------------------------------------\n10. CONTEXTO DE COMPRA\n--------------------------------------------------\n\nAntes de hablar seriamente de planes y cerrar:\n\n- Tiempo:\n  - \"¿Para cuándo te gustaría tener algo funcionando si avanzamos?\"\n- Decisión:\n  - \"Este tipo de decisiones, ¿las ves vos o las charlás con alguien más?\"\n- Presupuesto (sin apretar):\n  - \"¿Tenés un presupuesto en mente para esto o todavía lo estás explorando?\"\n\nSi el horizonte es muy lejano o súper vago, bajás intensidad y dejás FOLLOWUP.\n\n--------------------------------------------------\n11. PRECIO\n--------------------------------------------------\n\nTenés que responder sobre precios sin dar vueltas, sobre todo cuando el lead lo pide explícitamente.\n\nCuándo hablás de precio:\n\n- Cuando ellos lo preguntan explícitamente (“precio”, “cuánto sale”, “costos”, “tarifas”, etc.).\n- O cuando ya tenés contexto razonable (cómo vende, tamaño, urgencia) y están cerca de decidir.\n\nReglas duras:\n\n- Primero, reconocés la pregunta:\n  - “Tiene todo el sentido que quieras ver los costos.”\n- Dejás claro que los precios de NovaVision son públicos:\n  - “Los precios de NovaVision son públicos y los podés ver siempre actualizados en la página principal: https://novavision.lat.”\n- Usás pricing + el contexto del lead para ubicarlo en un tipo de plan en UNA frase:\n  - ej.: “Por lo que contás, la mayoría en tu situación arranca con un plan para emprendedores donde ya tenés tienda online, catálogo y cobros integrados.”\n- Podés mencionar que el valor puede moverse un poco por el dólar, pero no lo usás como excusa para no hablar de precio.\n- Si tenés fx y montos en pricing, podés hacer el cálculo interno y orientarlo con un rango aproximado en pesos (sin necesidad de ser exacto).\n- Nunca obligues a una llamada solo para decir un precio.\n- Después de mencionar precios / plan:\n  - Cerrás con un siguiente paso lógico:\n    - ver ejemplo de tienda,\n    - o invitar a demo / página https://novavision.lat/lead si ya mostró interés real.\n\n--------------------------------------------------\n12. ELECCIÓN DE PLAN (NO VENDAS POR INERCIA)\n--------------------------------------------------\n\nElegís el plan según LO QUE CUENTA la persona:\n\n- starter:\n  - Emprendedor solo o muy chico.\n  - Vende por redes.\n  - Quiere algo simple para que el cliente pueda ver y comprar directo.\n- growth:\n  - Pyme en crecimiento, más volumen, mejor imagen, dominio propio.\n  - Quiere panel bien armado, pero sin cosas súper a medida.\n- pro:\n  - Negocio más complejo: más sucursales, catálogo grande, integraciones o procesos más avanzados.\n- premium / enterprise (según venga en pricing):\n  - Marca grande o proyecto serio.\n  - Espera personalización y acompañamiento más dedicado.\n\nSi un plan te parece demasiado grande para la realidad del cliente, lo decís y orientás a algo que sí pueda aprovechar.\n\n--------------------------------------------------\n13. CIERRE Y DEMO CON ASESOR HUMANO\n--------------------------------------------------\n\nObjetivo final con un buen lead:\n\n- Que entienda que NovaVision le resuelve dolores concretos.\n- Que vea que no es “una web más”, sino una base para ordenar el negocio online.\n- Que se anime a dar un paso: demo / llamada con un asesor comercial.\n\nTenés DOS formas principales de empujar al siguiente paso:\n\n1) Mensaje directo para coordinar demo por WhatsApp.\n2) Enviar la página de leads: https://novavision.lat/lead\n\nEjemplos de demo por WhatsApp:\n\n- \"Si querés, el siguiente paso lógico es una llamada cortita con un asesor donde te muestra un ejemplo de tienda y vemos números más finos. ¿Te quedaría mejor en la semana a la mañana o a la tarde?\"\n- \"Con lo que me contás, parece que encajás bien con NovaVision. ¿Te gustaría que te agendemos una demo para verlo más concreto?\"\n\nEstados:\n\n- Si propone avanzar o acepta demo → lead_status = \"WON\" y conversation_stage = \"DEMO_BOOKED\" o \"CLOSING\" según corresponda.\n- Si está caliente pero todavía no decide → conversation_stage = \"CLOSING\" y interest_level = \"HIGH\".\n- Si no hay fit o dice que no quiere avanzar → lead_status = \"LOST\" y interest_level = \"LOW\".\n\nMETA-REGLAS:\n\n- Cada vez que propongas una demo, aclarás que es una demo gratuita.\n- Siempre que PROPONGAS demo, llamada, reunión o mostrar un ejemplo concreto (sea por WhatsApp o con la página https://novavision.lat/lead):\n  - seteás conversation_stage en \"DEMO_OFFERED\" o \"CLOSING\" (según qué tan cerca esté de decidir),\n  - agregás \"closing_cta\" a tags.\n- Siempre que envíes o menciones el link https://novavision.lat/lead:\n  - agregás también \"cta_lead_page\" a tags.\n- La demo SIEMPRE es gratuita y sin compromiso. \n\n\n\n--------------------------------------------------\n14. RESPUESTAS VAGAS Y LÍMITE DE DISCOVERY\n--------------------------------------------------\n\nSi inbound_text es vago ante preguntas de cantidad (“muchos”, “bastantes”, “varios”, “no sé bien”):\n\n- NO volvés a pedir un número.\n- Asumís que maneja muchos productos/modelos.\n- Redactás así:\n  - Línea 1: reconocés brevemente (\"OK, se nota que manejás bastantes modelos.\").\n  - Línea 2: beneficio de NovaVision para ese contexto.\n  - Línea 3: pregunta sobre OTRO eje (canal, problema principal, urgencia o objetivo).\n\nLímite de discovery:\n\n- Después de dos mensajes tuyos seguidos donde solo hiciste preguntas,\n  el siguiente mensaje TIENE QUE:\n  - resumir en UNA frase lo que entendiste,\n  - mencionar 1–2 beneficios concretos de NovaVision para ese caso,\n  - cerrar con una pregunta o siguiente paso (ej.: ejemplo de tienda, demo, hablar de cómo se cobra).\n\n--------------------------------------------------\n14.1 RESPUESTAS TIPO \"TODO / TODO LA VERDAD / LAS TRES\"\n--------------------------------------------------\n\nSi el cliente responde algo como:\n- \"Todo\", \"Todo la verdad\", \"Las tres\", \"Un poco de todo\", \"La verdad que todo\"\n\ncuando vos le diste varias opciones de dolor:\n\n- NO volvés a pedir que elija una opción.\n- Asumís que le duelen todas.\n\nEn ese caso hacés SIEMPRE esto:\n\n1) Una línea corta que reconozca la situación, sin repetir toda su frase.\n2) Una línea que conecte con NovaVision de forma concreta.\n3) Una pregunta de siguiente etapa (no otra encuesta de dolores).\n\nEn estos casos, como mínimo:\n\n- interest_level tiende a \"HIGH\" (salvo que el resto del history diga lo contrario).\n- Podés pasar conversation_stage a \"PROFUNDIZAR DOLORES\" o \"CONTEXTO DE COMPRA\", NO te quedes eternamente en \"DISCOVERY\".\n\n--------------------------------------------------\n15. REGLAS ANTI-REPETICIÓN Y ANTI-ECO\n--------------------------------------------------\n\n- Prohibido copiar la frase principal del cliente casi textual.\n  - Si el cliente dice: \"Actualmente vendo remeras por Instagram y WhatsApp y me gustaría tener una tienda donde los clientes compren directo y soy yo solo quien lo maneja\",\n    tu respuesta NO puede usar la misma estructura con 8+ palabras iguales seguidas.\n- Evitá muletillas tipo \"entendí que\", \"veo que\", \"por lo que me contás\" al inicio de cada mensaje.\n  - Podés usarlas muy de vez en cuando, pero no como arranque por defecto.\n- Tenés que reformular en tus palabras:\n  - \"Buenísimo, hoy vendés remeras por Instagram y WhatsApp y querés que el cliente pueda comprar directo sin escribirte tanto.\"\n- Como regla práctica:\n  - Podés reutilizar 1–3 palabras clave (remeras, tienda, Instagram),\n  - pero no más de 6 palabras seguidas iguales a lo que escribió el cliente.\n- Máximo un mini-resumen tipo \"Tiene sentido lo que contás\" cada 3 mensajes.\n- Cada reply tiene que aportar algo NUEVO:\n  - una pregunta de siguiente etapa,\n  - una aclaración concreta,\n  - o una propuesta de siguiente paso (demo, ejemplo, precios, etc.).\n\n--------------------------------------------------\n16. FORMATO DE SALIDA (OBLIGATORIO)\n--------------------------------------------------\n\nDevolvés SOLO un JSON válido, sin markdown, sin ``` y sin texto extra.\n\nPartís de un JSON de draft que ya tiene esta estructura mínima:\n\n{\n  \"reply\": \"....\",\n  \"lead_status\": \"WORKING\",\n  \"conversation_stage\": \"DISCOVERY\",\n  \"interest_level\": \"MED\",\n  \"pain_points\": [],\n  \"tags\": [],\n  \"next_followup_days\": 2\n}\n\nReglas:\n\n- Podés ajustar reply y, cuando tenga sentido según la conversación, también:\n  - lead_status\n  - conversation_stage\n  - interest_level\n  - pain_points\n  - tags\n  - next_followup_days\n- Si no estás seguro, dejá los campos como venían en el draft.\n- Siempre devolvés un JSON COMPLETO, con todas las claves anteriores presentes.\n\nEn reply:\n\n- Usás “vos”.\n- Máx 3–5 líneas.\n- Sin tecnicismos innecesarios.\n- Siempre cerrás con una pregunta o siguiente paso concreto.\n- Ajustás el nivel de presión (hacia demo/cierre) según el interés y el contexto.\n- Respetás SIEMPRE la REGLA CERO y la REGLA CERO BIS (no inventar rubro ni canal, no repreguntar lo que ya dijo).\n\n--------------------------------------------------\n17. EVITAR SONAR REPETITIVO (MUY IMPORTANTE)\n--------------------------------------------------\n\n- No repitas la misma pregunta con las mismas opciones más de una vez.\n  - Ejemplo: la pregunta “¿qué sentís que te complica más: el stock, los pedidos o el tiempo de responder?” se puede hacer UNA sola vez en toda la conversación.\n  - Si la persona responde “todo”, “ninguno, mi problema es X” o aclara su dolor principal, NO volvés a ofrecer la misma lista de opciones.\n\n- No arranques todos los mensajes con frases tipo:\n  - “Tiene sentido lo que contás…”\n  - “Muchos que venden así…”\n  - “Entiendo que…”, “Veo que…”\n  Usalas cada tanto o directamente saltealas.\n\n- Cuando el lead ya dijo claramente su problema principal (por ejemplo: “quiero llegar a más gente”, “necesito atraer clientes nuevos”):\n  - Tomás ESO como dolor prioritario.\n  - Dejá de preguntarle “qué te complica más: stock/pedidos/tiempo”.\n  - Pasás a:\n    - conectar 1–2 líneas con ese dolor, y\n    - proponer siguiente paso (explicar cómo le ayudarías, o avanzar a demo / ejemplo).\n\n"
+            }
+          ]
+        },
+        "options": {},
+        "requestOptions": {}
+      },
+      "id": "54ad5384-5eba-4e0d-baed-a39a9ac38b81",
+      "name": "AI Closer Brain",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        3248,
+        16
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "dUAJsadm0CkUACxy",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// El nodo anterior (Nova – Editor) devuelve algo como:\n// { \"text\": \"{ \\\"reply\\\": \\\"...\\\", \\\"lead_status\\\": \\\"...\\\", ... }\" }\n// o, si Simplify está apagado, en message.content.\n\nlet reply = '';\nlet leadStatus = 'WORKING';\nlet conversationStage = 'DISCOVERY';\nlet painPoints = [];\nlet interestLevel = 'MED';\nlet tags = [];\nlet nextFollowupDays = 2;\n\nconst data = $json;\n\n// 1) Detectar fuente principal del texto bruto\nlet rawContent = '';\n\nif (typeof data.text === 'string' && data.text.trim() !== '') {\n  rawContent = data.text;\n} else if (data.message?.content) {\n  rawContent = data.message.content;\n} else if (typeof data === 'string') {\n  rawContent = data;\n}\n\n// 2) Normalizar un poco el contenido\nif (typeof rawContent !== 'string') {\n  rawContent = String(rawContent || '');\n}\nrawContent = rawContent.trim();\n\n// 2.1) Si viene envuelto en ``` o ```json, los sacamos\nif (rawContent.startsWith('```')) {\n  // Sacar primera línea ``` o ```json\n  rawContent = rawContent.replace(/^```[a-zA-Z0-9]*\\s*/, '');\n  // Sacar ``` final\n  if (rawContent.endsWith('```')) {\n    rawContent = rawContent.slice(0, -3).trim();\n  }\n}\n\n// 3) Intentar parsear JSON\nlet parsed;\n\nfunction tryParse(str) {\n  try {\n    return JSON.parse(str);\n  } catch (e) {\n    return null;\n  }\n}\n\n// Primer intento: todo el string\nparsed = tryParse(rawContent);\n\n// Segundo intento: si falla, buscar el primer '{' y el último '}'\nif (!parsed) {\n  const first = rawContent.indexOf('{');\n  const last = rawContent.lastIndexOf('}');\n  if (first !== -1 && last !== -1 && last > first) {\n    const jsonSlice = rawContent.slice(first, last + 1);\n    parsed = tryParse(jsonSlice);\n  }\n}\n\n// Si sigue fallando, usamos el contenido crudo como reply\nif (!parsed) {\n  parsed = { reply: rawContent };\n}\n\n// 4) Extraer campos con defaults\nif (typeof parsed.reply === 'string') {\n  reply = parsed.reply;\n} else if (typeof rawContent === 'string' && rawContent.trim() !== '') {\n  reply = rawContent;\n} else {\n  reply =\n    'Gracias por escribirme. Contame en una frase cómo estás vendiendo hoy y qué te gustaría mejorar, así veo si NovaVision te puede sumar valor.';\n}\n\nif (typeof parsed.lead_status === 'string') {\n  leadStatus = parsed.lead_status;\n}\nif (typeof parsed.conversation_stage === 'string') {\n  conversationStage = parsed.conversation_stage;\n}\nif (Array.isArray(parsed.pain_points)) {\n  painPoints = parsed.pain_points;\n}\nif (typeof parsed.interest_level === 'string') {\n  interestLevel = parsed.interest_level;\n}\nif (Array.isArray(parsed.tags)) {\n  tags = parsed.tags;\n}\nif (typeof parsed.next_followup_days === 'number') {\n  nextFollowupDays = parsed.next_followup_days;\n}\n\n// -------------------------------------------------------------------\n// 5) Helpers y contexto del inbound\n// -------------------------------------------------------------------\nconst normalizeForCompare = (str) =>\n  String(str || '')\n    .toLowerCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '') // saca tildes\n    .replace(/[^a-z0-9ñü\\s]/gi, ' ') // limpia signos raros\n    .replace(/\\s+/g, ' ')\n    .trim();\n\nconst inboundClean =\n  normalizeForCompare($node['Normalize Input'].json.clean_text || '');\n\n// --- BLOQUE NUEVO: detectar rubros ilegales / sexuales explícitos ---\nconst illegalSexBizRegex =\n  /(prostitucion|prostitución|servicios sexuales|trabajo sexual|escort|acompanante|acompañante)/;\n\nconst isIllegalSexBiz = illegalSexBizRegex.test(inboundClean);\n\nif (isIllegalSexBiz) {\n  reply =\n    'Gracias por escribir. NovaVision está pensada para negocios que venden productos o servicios legales y formales (tiendas online, servicios profesionales, etc.). ' +\n    'Por el tipo de actividad que comentás, no somos la plataforma indicada, así que prefiero dejar la conversación acá. ' +\n    'Si más adelante tenés otro emprendimiento que sí entre en ese marco, escribime tranqui y lo vemos.';\n\n  leadStatus = 'LOST';\n  conversationStage = 'DISCOVERY';\n  interestLevel = 'LOW';\n  nextFollowupDays = 0;\n\n  if (!Array.isArray(tags)) tags = [];\n  if (!tags.includes('illegal_vertical')) tags.push('illegal_vertical');\n\n  return {\n    reply,\n    lead_status: leadStatus,\n    conversation_stage: conversationStage,\n    pain_points: painPoints,\n    interest_level: interestLevel,\n    tags,\n    next_followup_days: nextFollowupDays,\n  };\n}\n\n\n// detección básica de intención de precio\nconst wantsPrice =\n  inboundClean.includes('precio') ||\n  inboundClean.includes('precios') ||\n  inboundClean.includes('costo') ||\n  inboundClean.includes('costos') ||\n  inboundClean.includes('cuanto sale') ||\n  inboundClean.includes('cuánto sale') ||\n  inboundClean.includes('cuanto cuesta') ||\n  inboundClean.includes('cuánto cuesta') ||\n  inboundClean.includes('tarifa') ||\n  inboundClean.includes('tarifas') ||\n  inboundClean.includes('valor mensual') ||\n  inboundClean.includes('mensual');\n\n// detección básica de intención de demo / llamada / reunión / hablar con humano\nconst wantsDemo =\n  inboundClean.includes('demo') ||\n  inboundClean.includes('reunion') ||\n  inboundClean.includes('reunión') ||\n  inboundClean.includes('llamada') ||\n  inboundClean.includes('videollamada') ||\n  inboundClean.includes('agenda') ||\n  inboundClean.includes('agendar') ||\n  inboundClean.includes('reunirse') ||\n  inboundClean.includes('hablar con alguien') ||\n  inboundClean.includes('hablarlo con alguien') ||\n  inboundClean.includes('hablar con vos') ||\n  inboundClean.includes('charlar con alguien') ||\n  inboundClean.includes('charlarlo') ||\n  inboundClean.includes('quiero hablar') ||\n  inboundClean.includes('me llamen') ||\n  inboundClean.includes('me llames') ||\n  inboundClean.includes('llamarme') ||\n  inboundClean.includes('contacten') ||\n  inboundClean.includes('contactarme');\n\n// aceptación genérica tipo \"si dale\", \"dale\", \"ok dale\"\nconst isAcceptance =\n  inboundClean === 'si' ||\n  inboundClean === 'dale' ||\n  inboundClean === 'ok' ||\n  inboundClean.startsWith('si dale') ||\n  inboundClean.startsWith('si, dale') ||\n  inboundClean.includes('si dale') ||\n  inboundClean.includes('dale si');\n\n// -------------------------------------------------------------------\n// 6) Último mensaje del bot desde WA History + si alguna vez dijo \"no lo sé\"\n// -------------------------------------------------------------------\nlet lastBotMsg = '';\nlet userEverSaidNoSeTimeframe = false;\n\ntry {\n  const histRaw = $node['Get WA History'].json;\n  let history = [];\n\n  if (Array.isArray(histRaw)) {\n    history = histRaw;\n  } else if (histRaw && Array.isArray(histRaw.data)) {\n    history = histRaw.data;\n  } else if (histRaw && Array.isArray(histRaw.records)) {\n    history = histRaw.records;\n  }\n\n  if (history.length > 0) {\n    // Recorremos desde el final para tomar el ÚLTIMO BOT real\n    for (let i = history.length - 1; i >= 0; i--) {\n      const h = history[i];\n  if (\n  h &&\n  (h.direction === 'BOT' || h.direction === 'OUTBOUND') &&\n  typeof h.message_text === 'string'\n) {\n  lastBotMsg = h.message_text;\n}\n\n    }\n\n    // Marcar si en algún INBOUND anterior el cliente dijo \"no lo se / no se\"\n    for (let i = history.length - 1; i >= 0; i--) {\n      const h = history[i];\n      if (!h || h.direction !== 'INBOUND') continue;\n\n      const msgNorm = normalizeForCompare(h.message_text || '');\n      const saidNoSe =\n        msgNorm.includes('no lo se') || msgNorm.includes('no se');\n      const mentionsTimeWord =\n        msgNorm.includes('cuando') ||\n        msgNorm.includes('tiempo') ||\n        msgNorm.includes('fecha');\n\n      // Solo marcamos “no sé” para plazos si además habla de tiempo/fecha\n      if (saidNoSe && mentionsTimeWord) {\n        userEverSaidNoSeTimeframe = true;\n        break;\n      }\n    }\n\n  }\n} catch (e) {\n  lastBotMsg = '';\n  userEverSaidNoSeTimeframe = false;\n}\n\nconst lastBotNorm = normalizeForCompare(lastBotMsg);\nconst replyNorm = normalizeForCompare(reply);\n\n\n// -------------------------------------------------------------------\n// 6.1) ¿El cliente está respondiendo horario para demo/llamada?\n// -------------------------------------------------------------------\nconst inboundMentionsTime =\n  inboundClean.includes('manana') ||\n  inboundClean.includes('mañana') ||\n  inboundClean.includes('tarde') ||\n  inboundClean.includes('noche') ||\n  inboundClean.includes('lunes') ||\n  inboundClean.includes('martes') ||\n  inboundClean.includes('miercoles') ||\n  inboundClean.includes('miércoles') ||\n  inboundClean.includes('jueves') ||\n  inboundClean.includes('viernes') ||\n  inboundClean.includes('sabado') ||\n  inboundClean.includes('sábado') ||\n  inboundClean.includes('domingo') ||\n  inboundClean.includes('semana que viene') ||\n  inboundClean.includes('proxima semana') ||\n  inboundClean.includes('próxima semana') ||\n  inboundClean.includes('fin de semana');\n\nconst lastBotWasScheduling =\n  lastBotNorm.includes('llamada') ||\n  lastBotNorm.includes('demo') ||\n  lastBotNorm.includes('agenda') ||\n  lastBotNorm.includes('agendar');\n\nconst isSchedulingAnswer = inboundMentionsTime && lastBotWasScheduling;\n\n// -------------------------------------------------------------------\n// 6.2) Aceptación directa de demo / ayuda con plan\n// -------------------------------------------------------------------\nconst lastBotAskedDemoOrPlan =\n  lastBotNorm.includes('demo') ||\n  lastBotNorm.includes('coordinamos una demo') ||\n  lastBotNorm.includes('coordinamos una llamada') ||\n  lastBotNorm.includes('te ayudo a ver si ese plan') ||\n  lastBotNorm.includes('te ayudo a ver si ese') ||\n  lastBotNorm.includes('te puedo mostrar un ejemplo');\n\n// Si el cliente dice \"si / si dale / ok dale\" después de un CTA de demo,\n// NO seguimos en discovery: lo mandamos directo a la página de lead.\nif (isAcceptance && lastBotAskedDemoOrPlan) {\n  reply =\n    'Genial, avancemos entonces. Para coordinar la demo sin marearte con ida y vuelta por WhatsApp, lo más simple es que entres acá, mires el video corto y elijas día y horario que te quede cómodo:\\n' +\n    'https://novavision.lat/lead\\n\\n' +\n    'Completás esos datos y ahí seguimos con una demo bien aplicada a tu negocio. ¿Te queda cómodo completarlo hoy?';\n\n  if (leadStatus === 'WORKING') {\n    leadStatus = 'QUALIFIED';\n  }\n  conversationStage = 'DEMO_OFFERED';\n\n  if (interestLevel === 'LOW') {\n    interestLevel = 'MED';\n  } else {\n    interestLevel = 'HIGH';\n  }\n\n  if (!Array.isArray(tags)) tags = [];\n  if (!tags.includes('closing_cta')) tags.push('closing_cta');\n  if (!tags.includes('cta_lead_page')) tags.push('cta_lead_page');\n}\n\n\n\n// -------------------------------------------------------------------\n// 7) Marcar interés por preguntas de precio\n// -------------------------------------------------------------------\nif (!Array.isArray(tags)) {\n  tags = [];\n}\n\nif (wantsPrice) {\n  if (!tags.includes('price_question')) {\n    tags.push('price_question');\n  }\n  // si pregunta precios, por defecto lo tratamos como interés MED/HIGH\n  if (interestLevel === 'LOW') {\n    interestLevel = 'MED';\n  } else if (interestLevel === 'MED') {\n    interestLevel = 'HIGH';\n  }\n}\n\n// -------------------------------------------------------------------\n// 8) Guardrail para respuestas tipo \"Todo / las tres / un poco de todo\"\n//     -> en vez de seguir encuestando, ir a CTA de demo/call\n// -------------------------------------------------------------------\nconst saidTodo =\n  inboundClean.includes('todo la verdad') ||\n  inboundClean.includes('todo, la verdad') ||\n  inboundClean.includes('las tres') ||\n  inboundClean.includes('un poco de todo') ||\n  /\\btodo\\b/.test(inboundClean);\n\nif (saidTodo) {\n  const replyLower = reply.toLowerCase();\n\n  const isMultiChoiceLoop =\n    replyLower.includes('que es lo que mas te gustaria') ||\n    replyLower.includes('qué es lo que más te gustaría') ||\n    replyLower.includes('que te gustaria mejorar') ||\n    replyLower.includes('qué te gustaría mejorar') ||\n    replyLower.includes(\n      'que es lo que mas te gustaria ordenar primero'\n    ) ||\n    replyLower.includes(\n      'qué es lo que más te gustaría ordenar primero'\n    );\n\n  // Solo intervenimos si venís de una pregunta tipo \"elegí 1 de 3 dolores\"\n  if (isMultiChoiceLoop) {\n    reply =\n      'OK, se nota que hoy te está pesando todo: stock, presentación y el tiempo de estar respondiendo.\\n' +\n      'NovaVision justo apunta a ordenar catálogo, stock y pedidos para que tus clientes puedan entrar, ver y comprar directo sin escribirte por cada cosa.\\n' +\n      'Para no seguir dándote vueltas por WhatsApp, lo más útil es una llamada corta donde veamos tu caso y si tiene sentido avanzar ahora. ¿Te serviría coordinar una demo gratuita de 15 minutos esta semana o por ahora preferís solo ir viendo info por acá?';\n\n    // Si dijo \"todo\", es un lead con dolor real -> subimos interés\n    if (interestLevel === 'LOW') {\n      interestLevel = 'MED';\n    } else {\n      interestLevel = 'HIGH';\n    }\n\n    if (leadStatus === 'WORKING') {\n      leadStatus = 'QUALIFIED';\n    }\n\n    conversationStage = 'DEMO_OFFERED';\n\n    if (!Array.isArray(tags)) tags = [];\n    if (!tags.includes('closing_cta')) {\n      tags.push('closing_cta');\n    }\n  }\n}\n\n// -------------------------------------------------------------------\n// 8.1) No repetir preguntas de discovery tipo \"¿qué te complica más...?\"\n// -------------------------------------------------------------------\nfunction isDiscoveryMultiChoiceQuestion(text) {\n  const t = normalizeForCompare(text || '');\n  if (!t) return false;\n\n  const hasDiscoveryCue =\n    t.includes('que sentis que te complica mas') ||\n    t.includes('que sentis que hoy te complica mas') ||\n    t.includes('que es lo que mas te gustaria mejorar') ||\n    t.includes('que es lo que mas te gustaria ordenar') ||\n    t.includes('cual sentis que te pesa mas');\n\n  const hasClassicOptions =\n    (t.includes('stock') && t.includes('pedido')) ||\n    (t.includes('stock') && t.includes('pedidos')) ||\n    (t.includes('pedidos') && t.includes('tiempo'));\n\n  return hasDiscoveryCue || hasClassicOptions;\n}\n\nlet discoveryAskedBefore = false;\ntry {\n  const histRawDisc = $node['Get WA History'].json;\n  let histDisc = [];\n\n  if (Array.isArray(histRawDisc)) histDisc = histRawDisc;\n  else if (histRawDisc && Array.isArray(histRawDisc.data)) histDisc = histRawDisc.data;\n  else if (histRawDisc && Array.isArray(histRawDisc.records)) histDisc = histRawDisc.records;\n\n  for (const h of histDisc) {\n    if (!h || h.direction !== 'BOT') continue;\n    if (isDiscoveryMultiChoiceQuestion(h.message_text)) {\n      discoveryAskedBefore = true;\n      break;\n    }\n  }\n} catch (e) {\n  discoveryAskedBefore = false;\n}\n\nconst replyIsDiscoveryMultiChoice = isDiscoveryMultiChoiceQuestion(reply);\n\nif (discoveryAskedBefore && replyIsDiscoveryMultiChoice) {\n  // Si ya hicimos esta encuesta antes, no la repetimos: avanzamos de etapa\n  reply =\n    'Con lo que ya me contaste se entiende bien el panorama, no tiene sentido seguir con mil preguntas.\\n' +\n    'Lo que puedo hacer ahora es mostrarte en simple qué te ordenaría NovaVision (cómo se ve tu tienda, cómo entran los pedidos y cómo podrías aprovechar mejor lo online) y ver si tiene sentido que avancemos.\\n' +\n    '¿Preferís que te lo resuma en pocas líneas por acá o pasamos directo a coordinar una demo corta para verlo aplicado a tu caso?';\n\n  if (conversationStage === 'DISCOVERY') {\n    conversationStage = 'PROFUNDIZAR DOLORES';\n  }\n  if (interestLevel === 'LOW') {\n    interestLevel = 'MED';\n  }\n}\n\n\n// -------------------------------------------------------------------\n// 9) Similaridad más inteligente para detectar loop de pitch\n// -------------------------------------------------------------------\nfunction similarity(a, b) {\n  const aTokens = normalizeForCompare(a).split(' ').filter(Boolean);\n  const bTokens = normalizeForCompare(b).split(' ').filter(Boolean);\n  if (aTokens.length === 0 || bTokens.length === 0) return 0;\n\n  const aSet = new Set(aTokens);\n  const bSet = new Set(bTokens);\n\n  let intersection = 0;\n  for (const t of aSet) {\n    if (bSet.has(t)) intersection++;\n  }\n  const unionSize = new Set([...aSet, ...bSet]).size || 1;\n  return intersection / unionSize;\n}\n\nconst loopSimilarity = similarity(lastBotMsg, reply);\nconst looksLikeLoop = loopSimilarity >= 0.75;\n\nconst lastBotWasPitch =\n  lastBotNorm.includes('vendes remeras') ||\n  lastBotNorm.includes('vendes remera') ||\n  lastBotNorm.includes('vendés remeras') ||\n  lastBotNorm.includes('tienda online') ||\n  lastBotNorm.includes('te muestro un ejemplo rapido') ||\n  lastBotNorm.includes('te muestro un ejemplo rápido') ||\n  lastBotNorm.includes('te gustaria que te muestre') ||\n  lastBotNorm.includes('te gustaría que te muestre');\n\n// Si el cliente dice \"si dale\" y el modelo repite casi el mismo pitch,\n// forzamos avanzar de etapa (no repetir la misma perorata).\nif (isAcceptance && looksLikeLoop && lastBotWasPitch) {\n  reply =\n    'Genial, avancemos entonces. Lo que puedo hacer ahora es mostrarte un ejemplo concreto de cómo se vería tu tienda y cómo funcionaría con lo que vendés hoy.\\n\\n' +\n    '¿Preferís que te envíe un ejemplo por WhatsApp ahora o coordinamos una mini demo de 15 minutos para verlo en detalle?';\n\n  leadStatus = 'QUALIFIED';\n  conversationStage = 'DEMO_OFFERED';\n  if (interestLevel === 'LOW') {\n    interestLevel = 'MED';\n  } else {\n    interestLevel = 'HIGH';\n  }\n}\n\n// -------------------------------------------------------------------\n// 10) Guardrail anti-loop genérico (texto casi igual al último BOT)\n// -------------------------------------------------------------------\nlet isSameAsLastBot = false;\nif (lastBotNorm && replyNorm) {\n  const lenA = lastBotNorm.length;\n  const lenB = replyNorm.length;\n  const shorter = lenA <= lenB ? lastBotNorm : replyNorm;\n  const longer = lenA <= lenB ? replyNorm : lastBotNorm;\n\n  if (longer.includes(shorter)) {\n    const ratio = shorter.length / longer.length;\n    if (ratio > 0.8) {\n      isSameAsLastBot = true;\n    }\n  }\n}\n\nif (isSameAsLastBot) {\n  if (wantsPrice) {\n    // Si el cliente está pidiendo precio y el bot repite lo mismo que antes,\n    // forzamos un mensaje que hable de costos en vez de seguir dando vueltas.\n    reply =\n      'Bien, vayamos directo a lo que te importa: los costos. Tenemos distintos planes según el tamaño y la complejidad de tu negocio, pero para alguien que vende por redes suele encajar un plan inicial donde ya tenés tienda, catálogo y gestión de pedidos.\\n' +\n      'Hoy esos planes están pensados para que sean accesibles para un emprendimiento y se ajustan mejor en una llamada rápida donde vemos tu caso.\\n' +\n      '¿Te sirve que te oriente en una demo corta y ahí te damos el rango concreto según cómo estés trabajando hoy?';\n  } else {\n    // No es precio, pero igual está repitiendo: empujamos a siguiente paso\n    reply =\n      'Quedó claro lo que me contaste, no quiero seguir repitiendo lo mismo.\\n' +\n      'Con lo que ya sabemos de tu negocio, el siguiente paso lógico es mostrarte cómo se vería tu tienda y revisar números en concreto.\\n' +\n      '¿Te serviría una llamada corta para ver un ejemplo y terminar de ver si encaja para vos?';\n  }\n}\n\n// -------------------------------------------------------------------\n// 11) Guardrail de precio: si piden precio y la respuesta NO habla de precio\n// -------------------------------------------------------------------\nif (wantsPrice) {\n  const replyLower = reply.toLowerCase();\n  const talksAboutPrice =\n    replyLower.includes('precio') ||\n    replyLower.includes('precios') ||\n    replyLower.includes('costo') ||\n    replyLower.includes('costos') ||\n    replyLower.includes('cuanto sale') ||\n    replyLower.includes('cuánto sale') ||\n    replyLower.includes('cuanto cuesta') ||\n    replyLower.includes('cuánto cuesta') ||\n    replyLower.includes('tarifa') ||\n    replyLower.includes('tarifas') ||\n    replyLower.includes('valor mensual') ||\n    replyLower.includes('por mes') ||\n    replyLower.includes('mensual');\n\n  if (!talksAboutPrice) {\n    // Fallback: respuesta directa, precios públicos + plan orientativo\n    reply =\n      'Tiene todo el sentido que quieras ver los costos.\\n' +\n      'Los precios de NovaVision son públicos y los podés ver siempre actualizados en la página principal: https://novavision.lat.\\n' +\n      'Por lo que venimos charlando, mucha gente en una situación parecida a la tuya suele arrancar con un plan para emprendedores donde ya tenés tienda online, catálogo y cobros integrados.\\n' +\n      'Si querés, te ayudo a ver si ese plan te encaja y, si te cierra, coordinamos una demo corta para verlo aplicado a tu negocio.';\n  }\n}\n\n// -------------------------------------------------------------------\n// 11.1) Si está respondiendo horario, no sigas con pitch infinito\n// -------------------------------------------------------------------\nif (isSchedulingAnswer) {\n  reply =\n    'Genial, te queda mejor a la tarde. Para no marearte coordinando horarios por acá, tenemos una página donde podés ver un video corto, contarnos un poco más de tu negocio y elegir día y horario para la demo cuando te quede cómodo:\\n' +\n    'https://novavision.lat/lead\\n\\n' +\n    'Ahí nos llega toda la info y seguimos por ahí. ¿Te sirve?';\n\n  if (!Array.isArray(tags)) tags = [];\n  if (!tags.includes('cta_lead_page')) tags.push('cta_lead_page');\n\n  if (leadStatus === 'WORKING') {\n    leadStatus = 'QUALIFIED';\n  }\n  conversationStage = 'DEMO_OFFERED';\n  if (interestLevel === 'LOW') {\n    interestLevel = 'MED';\n  } else {\n    interestLevel = 'HIGH';\n  }\n}\n\n// -------------------------------------------------------------------\n// 11.2) Respuesta tipo \"no lo sé\" a la pregunta de plazo\n//      -> cortar el loop y mandar directo a la lead page\n// -------------------------------------------------------------------\n\n// Detectar variantes de \"no lo sé\"\nconst inboundSaysNoSe =\n  inboundClean === 'no lo se' ||\n  inboundClean === 'no se' ||\n  inboundClean.startsWith('no lo se ') ||\n  inboundClean.startsWith('no se ');\n\n// Detectar preguntas de plazo / urgencia, no solo \"para cuando...\"\nconst timeframePhrases = [\n  'para cuando te gustaria tener',\n  'para cuando te gustaria la tienda',\n  'para cuando te gustaria tener la tienda',\n  'cuando te gustaria poder tener esto funcionando',\n  'cuando te gustaria tener esto funcionando',\n  'cuando te gustaria tener algo asi funcionando',\n  'que tan urgente es',\n  'que tan urgente lo ves',\n];\n\nconst lastBotAskedTimeframe = timeframePhrases.some((p) =>\n  lastBotNorm.includes(p)\n);\n\nconst replyAsksTimeframe = timeframePhrases.some((p) =>\n  replyNorm.includes(p)\n);\n\n\n// Si el cliente dice (o dijo alguna vez) \"no lo se / no se\" y el bot está en modo plazo,\n// cortamos el tema tiempo y lo llevamos directo a la lead page.\nconst userRejectedTimeframe = inboundSaysNoSe || userEverSaidNoSeTimeframe;\n\nif (userRejectedTimeframe && (lastBotAskedTimeframe || replyAsksTimeframe)) {\n  reply =\n    'Está perfecto si todavía no tenés una fecha clara. Lo importante es ver si este tipo de tienda te suma de verdad.\\n' +\n    'Para eso, lo más útil es que veas un ejemplo y agendes una demo cuando te quede cómodo desde acá:\\n' +\n    'https://novavision.lat/lead\\n\\n' +\n    'Ahí contás un poco de tu negocio y elegís el horario que mejor te quede. ¿Te animás a completarlo y después seguimos por ahí?';\n\n  if (leadStatus === 'WORKING') {\n    leadStatus = 'QUALIFIED';\n  }\n  conversationStage = 'DEMO_OFFERED';\n\n  if (!Array.isArray(tags)) tags = [];\n  if (!tags.includes('closing_cta')) tags.push('closing_cta');\n  if (!tags.includes('cta_lead_page')) tags.push('cta_lead_page');\n\n  if (interestLevel === 'LOW') {\n    interestLevel = 'MED';\n  } else {\n    interestLevel = 'HIGH';\n  }\n}\n\n// -------------------------------------------------------------------\n// 11.3) Si el cliente ya tiene el link y solo agradece, no sigas empujando\n// -------------------------------------------------------------------\nconst inboundSaysThanksOrClose =\n  inboundClean === 'gracias' ||\n  inboundClean === 'muchas gracias' ||\n  inboundClean === 'dale gracias' ||\n  inboundClean.includes('gracias') ||\n  inboundClean.includes('listo gracias') ||\n  inboundClean.includes('ya lo complete') ||\n  inboundClean.includes('ya lo completé') ||\n  inboundClean.includes('ya lo voy a completar') ||\n  inboundClean.includes('ya lo veo') ||\n  inboundClean.includes('ya lo voy a ver');\n\nlet historyContainsLeadPage = false;\ntry {\n  const histRaw2 = $node['Get WA History'].json;\n  let history2 = [];\n\n  if (Array.isArray(histRaw2)) history2 = histRaw2;\n  else if (histRaw2 && Array.isArray(histRaw2.data)) history2 = histRaw2.data;\n  else if (histRaw2 && Array.isArray(histRaw2.records)) history2 = histRaw2.records;\n\n  historyContainsLeadPage = history2.some(\n    (h) =>\n      h &&\n      typeof h.message_text === 'string' &&\n      /novavision\\.lat\\/lead/.test(h.message_text)\n  );\n} catch (e) {\n  historyContainsLeadPage = false;\n}\n\nconst lateStageForClosing =\n  historyContainsLeadPage ||\n  (Array.isArray(tags) && tags.includes('cta_lead_page')) ||\n  ['DEMO_OFFERED', 'DEMO_BOOKED', 'CLOSING'].includes(conversationStage);\n\nif (inboundSaysThanksOrClose && lateStageForClosing) {\n  reply =\n    'Genial, gracias a vos. Cuando completes el formulario te llega la info y seguimos desde ahí. Si te surge alguna duda después de verlo, escribime por acá y lo vemos.';\n\n  if (leadStatus === 'WORKING') {\n    leadStatus = 'QUALIFIED';\n  }\n\n  // Marcamos que ya está en etapa de cierre / seguimiento\n  if (!['DEMO_BOOKED', 'WON', 'LOST'].includes(conversationStage)) {\n    conversationStage = 'CLOSING';\n  }\n\n  if (!Array.isArray(tags)) tags = [];\n  if (!tags.includes('cta_lead_page') && historyContainsLeadPage) {\n    tags.push('cta_lead_page');\n  }\n}\n\n\n\n// -------------------------------------------------------------------\n// 12) CTA página de lead (video + formulario + demo)\n// -------------------------------------------------------------------\nconst replyHasLeadPage = /novavision\\.lat\\/lead/.test(reply);\n\n// NUEVO: exigimos señales más fuertes y que NO sea el primer mensaje\n// Para eso, reusá la history que calculaste antes:\nlet historyLen = 0;\ntry {\n  const histRaw = $node['Get WA History'].json;\n  let history = [];\n\n  if (Array.isArray(histRaw)) history = histRaw;\n  else if (histRaw && Array.isArray(histRaw.data)) history = histRaw.data;\n  else if (histRaw && Array.isArray(histRaw.records)) history = histRaw.records;\n\n  historyLen = history.length;\n} catch (e) {\n  historyLen = 0;\n}\n\nconst inboundIsThankYou =\n  inboundClean.includes('gracias') ||\n  inboundClean.includes('dale gracias') ||\n  inboundClean.includes('listo gracias') ||\n  inboundClean.includes('ya lo complete') ||\n  inboundClean.includes('ya lo completé') ||\n  inboundClean.includes('ya lo voy a completar');\n\nconst shouldPushLeadPage =\n  !inboundIsThankYou &&\n  historyLen >= 2 && // nunca en el primer mensaje real\n  (\n    wantsDemo ||\n    ['QUALIFIED', 'WON'].includes(leadStatus) ||\n    ['DEMO_OFFERED', 'DEMO_BOOKED', 'CLOSING'].includes(conversationStage)\n  );\n\n\nif (shouldPushLeadPage && !replyHasLeadPage) {\n  reply +=\n    '\\n\\nPara verlo bien concreto y sin marearte por acá, tenemos una página donde podés ver un video corto, completar un formulario y agendar una demo cuando te quede cómodo:\\n' +\n    'https://novavision.lat/lead';\n\n  if (!Array.isArray(tags)) tags = [];\n  if (!tags.includes('cta_lead_page')) {\n    tags.push('cta_lead_page');\n  }\n}\n\n// -------------------------------------------------------------------\n// 12.bis) Guardrail anti-USD / dólares\n// -------------------------------------------------------------------\nconst replyLower2 = reply.toLowerCase();\nconst mentionsUsd = /\\b(usd|u\\$s|d[oó]lar(?:es)?|dolares|dólares)\\b/.test(replyLower2);\n\nif (mentionsUsd) {\n  // Reescribimos a una respuesta segura en pesos / web pública\n  reply =\n    'Tiene todo el sentido que quieras ver los costos.\\n' +\n    'Para no marearte con números sueltos, los precios de NovaVision son públicos y los podés ver siempre actualizados en la página principal: https://novavision.lat.\\n' +\n    'Por lo que venimos charlando, mucha gente en una situación parecida a la tuya suele arrancar con un plan para emprendedores donde ya tenés tienda online, catálogo y cobros integrados.\\n' +\n    'Si querés, te ayudo a ver si ese plan te encaja y, si te cierra, coordinamos una demo corta para verlo aplicado a tu negocio.';\n\n  if (!Array.isArray(tags)) tags = [];\n  if (!tags.includes('price_question')) {\n    tags.push('price_question');\n  }\n}\n\n\n// -------------------------------------------------------------------\n// 13) Limpiar muletillas y espacios raros\n// -------------------------------------------------------------------\nconst muletillas = [\n  /por lo que me cont[aá]s/gi,\n  /entiendo que/gi,\n  /veo que/gi,\n  /tiene sentido lo que cont[aá]s/gi,\n  /tiene sentido que/gi,\n  /muchos que venden/gi,\n  /muchos que usan/gi,\n];\n\nmuletillas.forEach((re) => {\n  reply = reply.replace(re, '');\n});\n\n// normalizar espacios y saltos de línea\nreply = reply\n  .replace(/[ \\t]+/g, ' ')\n  .replace(/\\s*\\n\\s*/g, '\\n')\n  .trim();\n\n// -------------------------------------------------------------------\n// 14) Pequeño límite de longitud\n// -------------------------------------------------------------------\nif (reply.length > 800) {\n  reply = reply.slice(0, 750) + '…\\n¿Te hace sentido hasta acá?';\n}\n\nconst aiStatus = $json.lead_status || 'WORKING';\n\nlet dbStatus;\n\n// Mapeos IA → DB\nswitch (aiStatus) {\n  case 'NEW':\n    dbStatus = 'NEW';\n    break;\n  case 'CLIENT':\n    dbStatus = 'CLIENT';\n    break;\n  case 'LOST':\n    dbStatus = 'DISCARDED';\n    break;\n  // Todo lo que sea “estamos hablando / trabajando el lead”\n  case 'WORKING':\n  default:\n    dbStatus = 'IN_CONVERSATION';\n    break;\n}\n\n// Mapear conversationStage de la IA → valores aceptados por la DB\nconst allowedStages = [\n  'INTRO',\n  'DISCOVERY',\n  'FOLLOWUP',\n  'CLOSING',\n  'DEMO_OFFERED',\n  'DEMO_BOOKED',\n];\n\nlet dbConversationStage = conversationStage || 'DISCOVERY';\n\n// Tus etiquetas nuevas se normalizan acá\nif (\n  dbConversationStage === 'PROFUNDIZAR_DOLORES' ||\n  dbConversationStage === 'PROFUNDIZAR DOLORES'\n) {\n  // Elegí a dónde querés mandarlo. Yo lo pondría como FOLLOWUP o DISCOVERY.\n  dbConversationStage = 'DISCOVERY';\n}\n\n// Si viene cualquier otra cosa rara, fallback seguro\nif (!allowedStages.includes(dbConversationStage)) {\n  dbConversationStage = 'DISCOVERY';\n}\n\n// -------------------------------------------------------------------\n// 15) Salida final normalizada\n// -------------------------------------------------------------------\nreturn {\n  reply,\n  lead_status: leadStatus,\n  conversation_stage: conversationStage,\n  pain_points: painPoints,\n  interest_level: interestLevel,\n  tags,\n  next_followup_days: nextFollowupDays,\n  db_status: dbStatus,\n  db_conversation_stage: dbConversationStage,\n};\n"
+      },
+      "id": "c26a33be-0520-44eb-9283-4fdc4310b852",
+      "name": "Normalize AI Output",
+      "type": "n8n-nodes-base.functionItem",
+      "typeVersion": 1,
+      "position": [
+        3616,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const status = $json.lead_status || 'WORKING';\nconst stage = $json.conversation_stage || 'DISCOVERY';\nconst interest = $json.interest_level || 'MED';\n\nlet isHot = false;\nif (interest === 'HIGH') isHot = true;\nif ([\"QUALIFIED\", \"WON\"].includes(status)) isHot = true;\nif ([\"DEMO_BOOKED\", \"CLOSING\"].includes(stage)) isHot = true;\n\nreturn {\n  ...$json,\n  is_hot_lead: isHot,\n};"
+      },
+      "id": "d6b46466-1dd9-4a68-a6bd-2c9cd922fe55",
+      "name": "Compute Hot Lead Flag",
+      "type": "n8n-nodes-base.functionItem",
+      "typeVersion": 1,
+      "position": [
+        4032,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json[\"is_hot_lead\"]}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "72c54a4b-bb1f-4160-b0b2-465f2c4f92a9",
+      "name": "Hot Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        4256,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "PATCH",
+        "url": "={{ $env.SUPABASE_URL\n   + '/rest/v1/outreach_leads?id=eq.'\n   + (\n       $node[\"Prepare Lead Data\"].json[\"lead_found\"]\n         ? $node[\"Prepare Lead Data\"].json[\"id\"]\n         : $node[\"Create Inbound Lead\"].json[0][\"id\"]\n     )\n}}",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ { hot_lead: true } }}",
+        "headerParametersJson": "={\"apikey\":\"{{$env.SUPABASE_SERVICE_ROLE}}\",\"Authorization\":\"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\",\"Content-Type\":\"application/json\",\"Prefer\":\"return=minimal\"}"
+      },
+      "id": "2a49e30b-a75b-4df9-8949-8e5fad26a6db",
+      "name": "Mark Lead Hot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        4480,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ \n  'https://graph.facebook.com/v22.0/' \n  + ($node[\"Parse Incoming & Media\"].json[\"phone_number_id\"] || $env.WHATSAPP_PHONE_NUMBER_ID) \n  + '/messages' \n}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WHATSAPP_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  messaging_product: 'whatsapp',\n  to: String($env.SALES_ALERT_PHONE || ''),\n  type: 'text',\n  text: {\n    body:\n      '🔥 Lead caliente para NovaVision\\n'\n      + 'Nombre: ' + ($node[\"Prepare Lead Data\"].json[\"name\"] || 'Sin nombre') + '\\n'\n      + 'Teléfono: ' \n        + ($node[\"Prepare Lead Data\"].json[\"phone\"] \n           || $node[\"Parse Incoming & Media\"].json[\"phone\"]) + '\\n'\n      + 'Interés: ' + ($node[\"Normalize AI Output\"].json[\"interest_level\"] || '-') + '\\n'\n      + 'Estado: ' + ($node[\"Normalize AI Output\"].json[\"lead_status\"] || '-') + '\\n'\n      + 'Stage: ' + ($node[\"Normalize AI Output\"].json[\"conversation_stage\"] || '-') + '\\n\\n'\n      + 'Escribile YA o agendá una demo.'\n  }\n} }}",
+        "options": {}
+      },
+      "id": "7da76823-11e1-490b-855b-2c8a5b323d09",
+      "name": "Notify Sales (Hot Lead)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4688,
+        320
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "requestMethod": "PATCH",
+        "url": "={{ $env.SUPABASE_URL\n   + '/rest/v1/outreach_leads?id=eq.'\n   + (\n       $node[\"Prepare Lead Data\"].json[\"lead_found\"]\n         ? $node[\"Prepare Lead Data\"].json[\"id\"]\n         : $node[\"Create Inbound Lead\"].json[0][\"id\"]\n     )\n}}",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "status",
+              "value": "={{ $node[\"Normalize AI Output\"].json.db_status || 'IN_CONVERSATION' }}"
+            },
+            {
+              "name": "conversation_stage",
+              "value": "={{ $node[\"Normalize AI Output\"].json.db_conversation_stage || 'DISCOVERY' }}"
+            },
+            {
+              "name": "interest_level",
+              "value": "={{ $node[\"Normalize AI Output\"].json.interest_level }}"
+            },
+            {
+              "name": "tags",
+              "value": "={{ $node[\"Normalize AI Output\"].json.tags }}"
+            },
+            {
+              "name": "pain_points",
+              "value": "={{ $node[\"Normalize AI Output\"].json.pain_points }}"
+            }
+          ]
+        },
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_SERVICE_ROLE }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_SERVICE_ROLE }}"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        }
+      },
+      "id": "ca6da5d3-1fc1-40cb-849a-cc007e6c1f0b",
+      "name": "Update Lead Intelligence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        4032,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 7,
+        "unit": "seconds"
+      },
+      "id": "7fa67095-6171-40a5-a023-fb5f286beac3",
+      "name": "Humanize Delay",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        4256,
+        96
+      ],
+      "webhookId": "bb4b6c73-c7ac-42bb-8f5e-6fb136b7480f"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v22.0/' \n   + ($node[\"Parse Incoming & Media\"].json[\"phone_number_id\"] || $env.WHATSAPP_PHONE_NUMBER_ID) \n   + '/messages' \n}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WHATSAPP_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \n  messaging_product: 'whatsapp',\n to: String(\n  $node[\"Normalize Input\"].json[\"phone\"] || ''\n),\n  type: 'text',\n  text: { body: $node[\"Normalize AI Output\"].json[\"reply\"] }\n} }}",
+        "options": {}
+      },
+      "id": "0ef2e9d3-9e1e-454e-a81d-cdb6887d3cd5",
+      "name": "Send WA Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4464,
+        96
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/outreach_logs' }}",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ {\n  lead_id: ($node[\"Prepare Lead Data\"].json[\"lead_found\"]\n    ? $node[\"Prepare Lead Data\"].json[\"id\"]\n    : $node[\"Create Inbound Lead\"].json[0][\"id\"]),\n  channel: 'WHATSAPP',\n  action: 'BOT_REPLY',\n  direction: 'BOT',\n  msg_type: 'text',\n  from_phone: 'BOT',\n  from_name: 'Nova (NovaVision)',\n  message_text: $node[\"Normalize AI Output\"].json[\"reply\"],\n  raw: $json\n} }}",
+        "headerParametersJson": "={\"apikey\":\"{{$env.SUPABASE_SERVICE_ROLE}}\",\"Authorization\":\"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\",\"Content-Type\":\"application/json\",\"Prefer\":\"return=minimal\"}"
+      },
+      "id": "9f05ec04-5dbb-4a27-9f96-2840e2f0d4b0",
+      "name": "Log Bot Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        4688,
+        96
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {
+          "language": "es"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        -1040,
+        448
+      ],
+      "id": "3b1edf4f-b543-4fb0-8436-94aa1852ac38",
+      "name": "Transcribe a recording",
+      "credentials": {
+        "openAiApi": {
+          "id": "dUAJsadm0CkUACxy",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/nv_playbook?topic=eq.pricing&active=eq.true' }}",
+        "jsonParameters": true,
+        "options": {
+          "splitIntoItems": false
+        },
+        "headerParametersJson": "={\"apikey\":\"{{$env.SUPABASE_SERVICE_ROLE}}\",\"Authorization\":\"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\",\"Content-Type\":\"application/json\"}"
+      },
+      "id": "ce2367c9-cead-4fe3-909b-45da95e9a90b",
+      "name": "Get NV Pricing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        1744,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://dolarapi.com/v1/dolares/blue",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1952,
+        288
+      ],
+      "id": "0f0849be-af49-42d4-aa46-bd3d23e14a89",
+      "name": "Get FX Blue",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tomamos la respuesta cruda de dolarapi\nconst d = $json || {};\n\nconst fx = {\n  source: 'dolarapi_blue',\n  currency: 'ARS',\n  usd_to_ars_blue_buy: Number(d.compra) || null,\n  usd_to_ars_blue_sell: Number(d.venta) || null,\n  updated_at: d.fechaActualizacion || null,\n};\n\nreturn {\n  fx,\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        288
+      ],
+      "id": "c2a408f3-845f-4c41-9e57-0bb6e7d30e88",
+      "name": "Prepare FX for AI"
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = $json;\n\n// Si no es un mensaje válido (ej: solo status), cortamos el flujo acá.\nif (base.valid_msg === false) {\n  return []; // no sale ningún item → el workflow termina\n}\n\nlet phoneForSend = base.phone_raw || '';\n\n// Parche solo para Argentina sandbox: 54911xxxxxxxx -> 5411xxxxxxxx\nif (typeof phoneForSend === 'string') {\n  phoneForSend = phoneForSend.replace(/^54911/, '5411');\n}\n\nreturn {\n  ...base,\n  phone_raw: phoneForSend,\n  phone: phoneForSend,\n  phone_for_send: phoneForSend,\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2384,
+        320
+      ],
+      "id": "2187bd28-8689-478d-867f-95404a3786b5",
+      "name": "Patch Phone For Sandbox"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lee/crea storage global del workflow\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.nvConfig) {\n  staticData.nvConfig = {};\n}\n\nconst now = Date.now();\n\n// TTLs\nconst TTL_PLAYBOOK_MS = 12 * 60 * 60 * 1000;  // 12 horas\nconst TTL_PRICING_MS  = 12 * 60 * 60 * 1000;  // 12 horas\nconst TTL_FX_MS       = 10 * 60 * 1000;       // 10 minutos\n\nconst cfg = staticData.nvConfig;\n\nfunction isFresh(ts, ttl) {\n  if (!ts) return false;\n  return (now - ts) < ttl;\n}\n\nconst hasPlaybook = Array.isArray(cfg.playbook) && isFresh(cfg.playbookCachedAt, TTL_PLAYBOOK_MS);\nconst hasPricing  = Array.isArray(cfg.pricing)  && isFresh(cfg.pricingCachedAt, TTL_PRICING_MS);\nconst hasFx       = !!cfg.fx && isFresh(cfg.fxCachedAt, TTL_FX_MS);\n\nreturn {\n  has_playbook: hasPlaybook,\n  has_pricing: hasPricing,\n  has_fx: hasFx,\n  playbook: hasPlaybook ? cfg.playbook : null,\n  pricing:  hasPricing  ? cfg.pricing  : null,\n  fx:       hasFx       ? cfg.fx       : null,\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        48
+      ],
+      "id": "8e18dacb-7213-4518-ab0d-5128423a9ef4",
+      "name": "Config Cache: Load"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0422a868-8b80-42d3-a632-80fc9004730e",
+              "leftValue": "={{ $json.has_playbook && $json.has_pricing && $json.has_fx }}",
+              "rightValue": "=true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1168,
+        48
+      ],
+      "id": "0254c0c5-0eb0-43c0-b025-86a281e271cb",
+      "name": "Config Cache Fresh?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Static data global\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.nvConfig) {\n  staticData.nvConfig = {};\n}\n\n// Traemos los outputs de los otros nodos\nconst playbookRows = $('Get NV Playbook').item.json || [];\nconst pricingRows  = $('Get NV Pricing').item.json || [];\nconst fxObj        = $('Prepare FX for AI').item.json.fx || null;\n\n// Guardamos en cache\nstaticData.nvConfig = {\n  playbook: playbookRows,\n  pricing:  pricingRows,\n  fx:       fxObj,\n  playbookCachedAt: Date.now(),\n  pricingCachedAt:  Date.now(),\n  fxCachedAt:       Date.now(),\n};\n\n// Devolvemos lo que usará la IA\nreturn {\n  playbook: playbookRows,\n  pricing:  pricingRows,\n  fx:       fxObj,\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2368,
+        288
+      ],
+      "id": "a448e1d0-c796-4ecb-8ed4-1185165b455e",
+      "name": "Config Cache: Save"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Rows crudos que vienen del cache o del save\nconst rawPlaybook = $json.playbook || [];\nconst rawPricing = $json.pricing || [];\nconst fx = $json.fx || null;\n\n// Datos del lead para segmentar un poco\nconst lead = $node[\"Prepare Lead Data\"].json || {};\nconst category = String(lead.category || '').toLowerCase();\n\n// Podés usar campos de notas / último mensaje si los tenés\nconst notes = (\n  (lead.notes || '') + ' ' +\n  (lead.last_message || '') + ' ' +\n  (lead.last_contact_notes || '')\n).toLowerCase();\n\n// Tags del lead si existen\nconst tags = Array.isArray(lead.tags)\n  ? lead.tags.map((t) => String(t).toLowerCase())\n  : [];\n\n// Segmentos base (siempre)\nconst segments = new Set(['general', 'generic']);\n\n// Heurística simple de segmento según rubro\nif (category.includes('ropa') || category.includes('indumentaria')) {\n  segments.add('tienda_ropa');\n}\n\nif (\n  category.includes('gym') ||\n  category.includes('gimnasio') ||\n  category.includes('fitness')\n) {\n  segments.add('gym');\n}\n\n// Heurística para segmento de integraciones\n// (ajustá estas palabras clave a gusto)\nconst needsIntegration =\n  tags.includes('requires_integration') ||\n  tags.includes('integraciones') ||\n  notes.includes('integración') ||\n  notes.includes('integraciones') ||\n  notes.includes('erp') ||\n  notes.includes('facturación') ||\n  notes.includes('pos') ||\n  (notes.includes('sistema') && notes.includes('stock'));\n\nif (needsIntegration) {\n  segments.add('requires_integration');\n}\n\n// Filtramos por segmento y active\nconst filtered = (Array.isArray(rawPlaybook) ? rawPlaybook : [])\n  .filter((row) => {\n    if (row.active === false) return false;\n    const seg = row.segment || 'general';\n    return segments.has(seg);\n  })\n  .sort((a, b) => (b.priority || 0) - (a.priority || 0)); // prioridad desc\n\n// Agrupamos por type y recortamos cantidad por tipo\nconst byType = {};\n\nfor (const row of filtered) {\n  const t = row.type || 'other';\n  if (!byType[t]) byType[t] = [];\n\n  // Máx 12 entradas por tipo para no explotar el contexto\n  if (byType[t].length >= 12) continue;\n\n  byType[t].push({\n    key: row.key,\n    segment: row.segment,\n    stage: row.stage,\n    type: row.type,\n    topic: row.topic,\n    title: row.title,\n    content: row.content,\n    priority: row.priority,\n  });\n}\n\nreturn {\n  playbook: byType,   // objeto agrupado por type\n  pricing: rawPricing,\n  fx,\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2752,
+        32
+      ],
+      "id": "2f101543-c5aa-4ec0-8f0d-6c8f9d568ed1",
+      "name": "Config For AI"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "242b568d-87d2-467a-8b74-384f2f71526d",
+              "leftValue": "={{ $json[\"valid_msg\"] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2176,
+        320
+      ],
+      "id": "68f48b59-ebc7-4304-b412-883241e85874",
+      "name": "Valid WA Message?"
+    }
+  ],
+  "connections": {
+    "WhatsApp Inbound Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Incoming & Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Incoming & Media": {
+      "main": [
+        [
+          {
+            "node": "Patch Phone For Sandbox",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router by Msg Type": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Media URL (Audio)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Image Placeholder Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Video Placeholder Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Media URL (Audio)": {
+      "main": [
+        [
+          {
+            "node": "Download Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Audio": {
+      "main": [
+        [
+          {
+            "node": "Transcribe a recording",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image Placeholder Text": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Placeholder Text": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Check Stop / Spam",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Stop / Spam": {
+      "main": [
+        [
+          {
+            "node": "Mark Lead LOST",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Lead in Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Lead LOST": {
+      "main": [
+        [
+          {
+            "node": "Send Opt-out Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Lead in Supabase": {
+      "main": [
+        [
+          {
+            "node": "Prepare Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Lead Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Found?": {
+      "main": [
+        [
+          {
+            "node": "Update Existing Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Inbound Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Existing Lead": {
+      "main": [
+        [
+          {
+            "node": "Get WA History",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Inbound Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Inbound Lead": {
+      "main": [
+        [
+          {
+            "node": "Get WA History",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Inbound Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get WA History": {
+      "main": [
+        [
+          {
+            "node": "Config Cache: Load",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get NV Playbook": {
+      "main": [
+        [
+          {
+            "node": "Get NV Pricing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bot Enabled?": {
+      "main": [
+        [
+          {
+            "node": "AI Closer Brain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Closer Brain": {
+      "main": [
+        [
+          {
+            "node": "Normalize AI Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize AI Output": {
+      "main": [
+        [
+          {
+            "node": "Update Lead Intelligence",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Compute Hot Lead Flag",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Hot Lead Flag": {
+      "main": [
+        [
+          {
+            "node": "Hot Lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hot Lead?": {
+      "main": [
+        [
+          {
+            "node": "Mark Lead Hot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Lead Hot": {
+      "main": [
+        [
+          {
+            "node": "Notify Sales (Hot Lead)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead Intelligence": {
+      "main": [
+        [
+          {
+            "node": "Humanize Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Humanize Delay": {
+      "main": [
+        [
+          {
+            "node": "Send WA Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WA Reply": {
+      "main": [
+        [
+          {
+            "node": "Log Bot Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe a recording": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get NV Pricing": {
+      "main": [
+        [
+          {
+            "node": "Get FX Blue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get FX Blue": {
+      "main": [
+        [
+          {
+            "node": "Prepare FX for AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare FX for AI": {
+      "main": [
+        [
+          {
+            "node": "Config Cache: Save",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Patch Phone For Sandbox": {
+      "main": [
+        [
+          {
+            "node": "Valid WA Message?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config Cache: Load": {
+      "main": [
+        [
+          {
+            "node": "Config Cache Fresh?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config Cache Fresh?": {
+      "main": [
+        [
+          {
+            "node": "Config For AI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get NV Playbook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config Cache: Save": {
+      "main": [
+        [
+          {
+            "node": "Config For AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config For AI": {
+      "main": [
+        [
+          {
+            "node": "Bot Enabled?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid WA Message?": {
+      "main": [
+        [
+          {
+            "node": "Router by Msg Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {
+    "WhatsApp Inbound Webhook": [
+      {
+        "headers": {
+          "host": "n8n-production-c19d.up.railway.app",
+          "user-agent": "facebookexternalua",
+          "content-length": "507",
+          "accept": "*/*",
+          "accept-encoding": "deflate, gzip",
+          "content-type": "application/json",
+          "x-forwarded-for": "173.252.95.36",
+          "x-forwarded-host": "n8n-production-c19d.up.railway.app",
+          "x-forwarded-proto": "https",
+          "x-hub-signature": "sha1=20ccaebd46f7bb346915069ff8a6ef5351206db3",
+          "x-hub-signature-256": "sha256=1b6f4f71bab95f308b7857ea59968ee3e082c0eb73c8faac052898610f2c6eec",
+          "x-railway-edge": "railway/us-east4-eqdc4a",
+          "x-railway-request-id": "gmmmKCD7T3GqIE13g4a9AQ",
+          "x-real-ip": "173.252.95.36",
+          "x-request-start": "1763900375883"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "object": "whatsapp_business_account",
+          "entry": [
+            {
+              "id": "1241761947785225",
+              "changes": [
+                {
+                  "value": {
+                    "messaging_product": "whatsapp",
+                    "metadata": {
+                      "display_phone_number": "15551696937",
+                      "phone_number_id": "859363390593864"
+                    },
+                    "contacts": [
+                      {
+                        "profile": {
+                          "name": "Belén Lauría"
+                        },
+                        "wa_id": "5491131181802"
+                      }
+                    ],
+                    "messages": [
+                      {
+                        "from": "5491131181802",
+                        "id": "wamid.HBgNNTQ5MTEzMTE4MTgwMhUCABIYIEFDQzRBNTQ5NTk2OTk4N0NBNTlGRTZERThFQ0M0MTRFAA==",
+                        "timestamp": "1763900374",
+                        "text": {
+                          "body": "Hola"
+                        },
+                        "type": "text"
+                      }
+                    ]
+                  },
+                  "field": "messages"
+                }
+              ]
+            }
+          ]
+        },
+        "webhookUrl": "https://n8n-production-c19d.up.railway.app/webhook/whatsapp-inbound",
+        "executionMode": "production"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "98a465d2095d2a078b1b18cec263ded6c699d7de61e2e25f223e8ca870ed6831"
+  }
+}

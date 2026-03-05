@@ -1,0 +1,323 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/outreach_logs' }}",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\n  \"lead_id\": {{$node[\"Get NEW leads\"].json[\"id\"]}},\n  \"channel\": \"WHATSAPP\",\n  \"action\": \"SEED\",\n  \"error_message\": {{ $json[\"error\"] && $json[\"error\"][\"message\"] ? $json[\"error\"][\"message\"] : null }},\n  \"raw\": {{ $json }}\n}",
+        "headerParametersJson": "={\n  \"apikey\": \"{{$env.SUPABASE_SERVICE_ROLE}}\",\n  \"Authorization\": \"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\",\n  \"Content-Type\": \"application/json\",\n  \"Prefer\": \"return=minimal\"\n}"
+      },
+      "name": "Log WA attempt1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        4336,
+        -928
+      ],
+      "id": "08a82d4c-a098-466a-86f9-f7e39a93a85e",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/outreach_logs' }}",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\n  \"lead_id\": {{$node[\"Get NEW leads\"].json[\"id\"]}},\n  \"channel\": \"EMAIL\",\n  \"action\": \"SEED\",\n  \"error_message\": {{ $json[\"error\"] && $json[\"error\"][\"message\"] ? $json[\"error\"][\"message\"] : null }},\n  \"raw\": {{ $json }}\n}",
+        "headerParametersJson": "={\n  \"apikey\": \"{{$env.SUPABASE_SERVICE_ROLE}}\",\n  \"Authorization\": \"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\",\n  \"Content-Type\": \"application/json\",\n  \"Prefer\": \"return=minimal\"\n}"
+      },
+      "name": "Log Email attempt1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        4336,
+        -656
+      ],
+      "id": "39c02f8b-4df9-4ef4-94b1-d84fa90cc0b8",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {},
+      "name": "Daily Seed",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        3168,
+        -816
+      ],
+      "id": "1d955e90-310d-461f-8385-cf912ae443a0"
+    },
+    {
+      "parameters": {
+        "url": "={{\n  $env.SUPABASE_URL\n  + '/rest/v1/outreach_leads'\n  + '?status=eq.NEW'\n  + '&order=created_at.asc'\n  + '&limit=50'\n  + '&select=id,name,phone,email,attempt_count,status,last_channel,last_contact_at,next_followup_at'\n}}",
+        "jsonParameters": true,
+        "options": {
+          "splitIntoItems": true
+        },
+        "headerParametersJson": "={\n  \"apikey\": \"{{$env.SUPABASE_SERVICE_ROLE}}\",\n  \"Authorization\": \"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\",\n  \"Content-Type\": \"application/json\"\n}"
+      },
+      "name": "Get NEW leads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        3408,
+        -816
+      ],
+      "id": "f5d327da-ef88-486f-ba8b-71d6ce77878e"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [],
+          "string": [
+            {
+              "value1": "={{$json[\"phone\"]}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "name": "Has phone?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        3632,
+        -816
+      ],
+      "id": "b8c0506b-0d92-4854-8819-59f839ea5af3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v22.0/859363390593864/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WHATSAPP_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"={{ $json['phone'] ? $json['phone'].toString().replace(/[^0-9]/g, '') : '' }}\",\n  \"type\": \"template\",\n  \"template\": {\n    \"name\": \"novavision_seed\",\n    \"language\": {\n      \"code\": \"es_AR\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        3856,
+        -928
+      ],
+      "id": "40efd8c4-d935-4d2e-abbe-2322c5d0f281",
+      "name": "HTTP Request",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "requestMethod": "PATCH",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/outreach_leads?id=eq.' + $node[\"Get NEW leads\"].json[\"id\"] }}",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ (() => { const days = 5; return { status: 'CONTACTED', last_channel: 'WHATSAPP', last_contact_at: $now, attempt_count: 0, next_followup_at: new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString() }; })() }}",
+        "headerParametersJson": "={\n  \"apikey\": \"{{$env.SUPABASE_SERVICE_ROLE}}\",\n  \"Authorization\": \"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\",\n  \"Content-Type\": \"application/json\",\n  \"Prefer\": \"return=minimal\"\n}"
+      },
+      "name": "Update lead (WA)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        4096,
+        -928
+      ],
+      "id": "db968916-f199-4ab9-87cf-2c550e6edb49",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [],
+          "string": [
+            {
+              "value1": "={{$json[\"email\"]}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "name": "Has email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        3632,
+        -656
+      ],
+      "id": "6887a9f3-30f3-466a-bdef-46665f28fd61"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "subject": "=Pregunta rápida sobre {{$json[\"name\"] || \"tu negocio\"}}",
+        "includeHtml": true,
+        "htmlMessage": "=<div style=\"max-width:600px;margin:0 auto;background:#0b0f1d;color:#f5f7ff;font-family:'Segoe UI',Arial,sans-serif;border-radius:18px;overflow:hidden;border:1px solid #1b2238;box-shadow:0 18px 40px rgba(22,33,66,0.28);\">      <div style=\"padding:36px 40px 28px 40px;background:linear-gradient(135deg,#121a2f,#0c1426 55%,#09101f);border-bottom:1px solid #1d2640;text-align:center;\">     <img src=\"https://novavision.lat/logo/logo.png\" width=\"132\" height=\"90\" alt=\"NovaVision\" style=\"display:inline-block;margin-bottom:18px;\">     <p style=\"margin:0;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#4ab8ff;font-weight:600;\">Tu Socio Tecnológico</p>   </div>    <div style=\"padding:40px 40px 20px 40px;\">          <h1 style=\"margin:0 0 18px;font-size:24px;font-weight:600;color:#eaf2ff;line-height:1.3;\">       Hola {{ $json[\"name\"] ? $json[\"name\"] : \"colega\" }},<br>       <span style=\"color:#7ea9ff;\">¿Te imaginás tener tu propio equipo de desarrollo?</span>     </h1>      <p style=\"font-size:16px;line-height:1.6;color:#c9d5ff;margin-bottom:24px;\">       Soy <strong>Elías</strong>, de NovaVision. Muchos dueños de negocio pierden horas luchando con plugins, actualizaciones o webs que se caen.      </p>          <p style=\"font-size:16px;line-height:1.6;color:#c9d5ff;margin-bottom:30px;\">       Nuestra propuesta es distinta: <strong>Nosotros nos ocupamos de la tecnología, vos de vender.</strong> Te damos un panel administrativo integral (verificado y simple) para que gestiones todo tu negocio sin conocimientos técnicos.     </p>      <div style=\"background:#151d33;border:1px solid #1e2a45;border-radius:14px;padding:24px;margin-bottom:30px;\">       <p style=\"margin:0 0 16px;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:#6d8ad8;text-align:center;\">Todo el control en un solo lugar</p>              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">         <tr>           <td width=\"50%\" style=\"padding-right:10px;vertical-align:top;\">             <div style=\"margin-bottom:16px;\">               <strong style=\"color:#eaf2ff;font-size:15px;\">📦 Gestión Total</strong>               <p style=\"margin:4px 0 0;font-size:13px;color:#aebfe6;\">Control de Productos, Stock y Usuarios al instante.</p>             </div>             <div style=\"margin-bottom:16px;\">               <strong style=\"color:#eaf2ff;font-size:15px;\">🎨 Diseño & Marcas</strong>               <p style=\"margin:4px 0 0;font-size:13px;color:#aebfe6;\">Banners, Logos y FAQs editables sin código.</p>             </div>           </td>           <td width=\"50%\" style=\"padding-left:10px;vertical-align:top;\">             <div style=\"margin-bottom:16px;\">               <strong style=\"color:#eaf2ff;font-size:15px;\">📈 Analytics Real</strong>               <p style=\"margin:4px 0 0;font-size:13px;color:#aebfe6;\">KPIs y reportes de venta claros para decidir mejor.</p>             </div>             <div style=\"margin-bottom:16px;\">               <strong style=\"color:#eaf2ff;font-size:15px;\">💳 Pagos Integrados</strong>               <p style=\"margin:4px 0 0;font-size:13px;color:#aebfe6;\">Configuración simple de pasarelas y reservas.</p>             </div>           </td>         </tr>       </table>     </div>      <div style=\"padding:20px;border-left:4px solid #4ab8ff;background:linear-gradient(90deg, rgba(74, 184, 255, 0.1) 0%, transparent 100%);border-radius:4px;margin-bottom:30px;\">       <p style=\"margin:0;font-size:15px;font-style:italic;color:#eaf2ff;\">         \"Funcionamos como tu equipo de desarrollo in-house, pero <strong>sin costo extra</strong>. Si tenés un problema o necesitás un ajuste, estamos ahí. Servicio personalizado y humano, no un bot.\"       </p>     </div>    </div>    <div style=\"padding:0 40px 40px 40px;text-align:center;\">     <p style=\"font-size:15px;color:#d7e3ff;margin-bottom:24px;line-height:1.5;\">       Agendemos una demo de 15 minutos. Te muestro el panel en vivo y vemos cómo podemos potenciar {{ $json[\"name\"] ? $json[\"name\"] : \"tu marca\" }}.     </p>      <a href=\"https://novavision.lat/lead\"         target=\"_blank\"         style=\"display:inline-block;background:#4ab8ff;color:#041722;text-decoration:none;padding:16px 36px;border-radius:50px;font-weight:700;font-size:16px;box-shadow:0 4px 20px rgba(74, 184, 255, 0.4);margin-bottom:16px;\">       📅 Agendar Demo en el Calendario     </a>          <br>      <a href=\"https://wa.me/5491139306801?text=Hola%20Elías,%20me%20interesa%20ver%20el%20dashboard%20de%20NovaVision\"         target=\"_blank\"         style=\"display:inline-block;font-size:14px;color:#7f8fb7;text-decoration:none;border:1px solid #2c3a5c;padding:10px 20px;border-radius:30px;margin-top:8px;\">       O escribime por WhatsApp     </a>    </div>    <div style=\"padding:24px 40px;background:#070b16;border-top:1px solid #1b2236;text-align:center;\">     <p style=\"margin:0 0 8px;font-size:12px;color:#5f6e99;\">       NovaVision · Tu partner tecnológico.<br>     </p>     <div style=\"font-size:11px;color:#45527a;\">       <a href=\"https://novavision.lat\" style=\"color:#5f6e99;text-decoration:none;\">Sitio Web</a> |        <a href=\"https://www.instagram.com/novavision.tienda\" style=\"color:#5f6e99;text-decoration:none;\">Instagram</a>     </div>   </div> </div>",
+        "message": "=",
+        "additionalFields": {}
+      },
+      "name": "Send Email Intro",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        3856,
+        -656
+      ],
+      "id": "8c18f5b5-f0a0-42e2-83d9-b32c821bba71",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yWIgAG6zWIonR54e",
+          "name": "Gmail account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "requestMethod": "PATCH",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/outreach_leads?id=eq.' + $node[\"Get NEW leads\"].json[\"id\"] }}",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ (() => { const days = 5; return { status: 'CONTACTED', last_channel: 'EMAIL', last_contact_at: $now, attempt_count: 0, next_followup_at: new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString() }; })() }}",
+        "headerParametersJson": "={\n  \"apikey\": \"{{$env.SUPABASE_SERVICE_ROLE}}\",\n  \"Authorization\": \"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\",\n  \"Content-Type\": \"application/json\",\n  \"Prefer\": \"return=minimal\"\n}"
+      },
+      "name": "Update lead (Email)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        4096,
+        -656
+      ],
+      "id": "6be3fbae-464f-4776-8ffe-4e543869b652",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "content": "## Real Flow",
+        "height": 80,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3200,
+        -960
+      ],
+      "id": "1463c54b-22fd-42c7-a32a-4418aafb8d24",
+      "name": "Sticky Note3"
+    }
+  ],
+  "connections": {
+    "Daily Seed": {
+      "main": [
+        [
+          {
+            "node": "Get NEW leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get NEW leads": {
+      "main": [
+        [
+          {
+            "node": "Has phone?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Has email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has phone?": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Update lead (WA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update lead (WA)": {
+      "main": [
+        [
+          {
+            "node": "Log WA attempt1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has email?": {
+      "main": [
+        [
+          {
+            "node": "Send Email Intro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email Intro": {
+      "main": [
+        [
+          {
+            "node": "Update lead (Email)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update lead (Email)": {
+      "main": [
+        [
+          {
+            "node": "Log Email attempt1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "98a465d2095d2a078b1b18cec263ded6c699d7de61e2e25f223e8ca870ed6831"
+  }
+}

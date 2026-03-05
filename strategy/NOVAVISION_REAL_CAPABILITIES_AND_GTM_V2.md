@@ -218,7 +218,7 @@ SeoAutopilotDashboard             seo-ai/ + seo/ + seo-ai-billing/     ↓
 |------|---------------|----------------|--------|
 | **Starter** | $20 | basic | Emprendedores que empiezan |
 | **Growth** | $60 (recomendado) | professional | Pymes en crecimiento |
-| **Enterprise** | $250 | premium, pro, scale | Operaciones grandes |
+| **Enterprise** | $390 | premium, pro, scale | Operaciones grandes |
 
 #### Entitlements por plan (configurables en DB)
 
@@ -404,7 +404,7 @@ NovaVision compite como **SaaS de e-commerce enfocado en pymes argentinas** con 
 |------|---------|-----------|--------|
 | **Starter** | $20 | $0 | Emprendedores que empiezan, 1er tienda online |
 | **Growth** | $60 | $0 | Pymes con catálogo >50 productos, necesitan analytics + cupones |
-| **Enterprise** | $250 | $0 | Operaciones grandes, DB dedicada, dominio custom |
+| **Enterprise** | $390 | $0 | Operaciones grandes, DB dedicada, dominio custom |
 
 **Conversión USD→ARS:** Automática vía tasa blue rate, ajuste diario en suscripciones MP.
 

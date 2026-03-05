@@ -132,7 +132,7 @@ El plan maestro se adapta a un sistema de suscripciones **ya maduro** (3600+ lí
 
 ### 2.4 Enterprise a USD 390 (Definitivo)
 
-**Decisión confirmada:** Enterprise queda en **USD 390/mes** (USD 3.900/año con 2 meses gratis). No hay grandfather policy — es el precio definitivo. Los clientes actuales en Enterprise $250 migran al nuevo precio.
+**Decisión confirmada:** Enterprise queda en **USD 390/mes** (USD 3.500/año). No hay grandfather policy — es el precio definitivo. Los clientes actuales en Enterprise $250 migran al nuevo precio.
 
 **Migración:**
 1. UPDATE `plans SET monthly_fee = 390 WHERE plan_key = 'enterprise'`
@@ -1515,7 +1515,7 @@ Devuelve CountryContext completo del tenant (país, moneda, locale, impuestos).
 |------|---------|-------------------------|
 | Starter | $20 | $200 |
 | Growth | $60 | $600 |
-| Enterprise | $390 | $3.900 |
+| Enterprise | $390 | $3.500 |
 
 ### 10.2 Fórmula COGS
 

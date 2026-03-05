@@ -42,7 +42,7 @@ NovaVision es una **plataforma de e-commerce todo-en-uno** pensada para pymes y 
 
 **Lo que le decimos:** "Dejá de perder plata en comisiones. Con NovaVision tenés SEO con IA, cupones, analytics y envíos integrados. Desde USD 60/mes, sin comisión por venta."
 
-### 👤 La empresa que necesita escalar (Plan Enterprise — USD 120/mes)
+### 👤 La empresa que necesita escalar (Plan Enterprise — USD 390/mes)
 
 - Tiene un catálogo grande y operación compleja.
 - Necesita infraestructura dedicada y dominio propio.

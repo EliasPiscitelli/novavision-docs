@@ -1,0 +1,531 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 11
+            },
+            {
+              "hour": 17
+            }
+          ]
+        }
+      },
+      "id": "4917c5d3-12b2-4f9b-8524-cc8782c87ada",
+      "name": "Daily Follow-ups",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -1088,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/outreach_leads' + '?status=eq.CONTACTED' + '&next_followup_at=lte.' + encodeURIComponent($now) + '&order=next_followup_at.asc' + '&limit=100' + '&select=*' }}",
+        "jsonParameters": true,
+        "options": {
+          "splitIntoItems": true
+        },
+        "headerParametersJson": "={\"apikey\": \"{{$env.SUPABASE_SERVICE_ROLE}}\", \"Authorization\": \"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\", \"Content-Type\": \"application/json\"}"
+      },
+      "id": "e454dd05-1701-4e09-9c94-e18121161e58",
+      "name": "Get leads for follow-up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        -848,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "value1": "={{$json[\"attempt_count\"] || 1}}"
+      },
+      "id": "7ae6e983-2f14-47ce-bb76-28b9ff86283e",
+      "name": "Attempt dispatcher",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        -608,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"last_channel\"]}}",
+              "value2": "WHATSAPP"
+            }
+          ]
+        }
+      },
+      "id": "a0376b09-ab70-4668-919f-8e6a61face59",
+      "name": "Channel? (FU1)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"last_channel\"]}}",
+              "value2": "WHATSAPP"
+            }
+          ]
+        }
+      },
+      "id": "1dc05a99-f3b5-49af-b498-280ce2e0db6b",
+      "name": "Channel? (FU2)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"last_channel\"]}}",
+              "value2": "WHATSAPP"
+            }
+          ]
+        }
+      },
+      "id": "df1197ec-6a99-4e6e-90f4-e75cdfb3fbe2",
+      "name": "Channel? (FU3)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{$env.WHATSAPP_PHONE_NUMBER_ID}}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WHATSAPP_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { messaging_product: 'whatsapp', to: $node[\"Get leads for follow-up\"].json['phone'].toString().replace(/[^0-9]/g, ''), type: 'template', template: { name: 'novavision_followup1', language: { code: 'es' }, components: [ { type: 'body', parameters: [ { type: 'text', text: $node[\"Get leads for follow-up\"].json['name'] || 'Hola' } ] } ] } } }}",
+        "options": {}
+      },
+      "id": "c411227b-a731-4ed1-ab08-6c8f4e758d02",
+      "name": "Send WA FU1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -128,
+        64
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{$env.WHATSAPP_PHONE_NUMBER_ID}}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WHATSAPP_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { messaging_product: 'whatsapp', to: $node[\"Get leads for follow-up\"].json['phone'].toString().replace(/[^0-9]/g, ''), type: 'template', template: { name: 'novavision_followup2', language: { code: 'es' }, components: [ { type: 'body', parameters: [ { type: 'text', text: $node[\"Get leads for follow-up\"].json['name'] || 'Hola' }, { type: 'text', text: $node[\"Get leads for follow-up\"].json['category'] || 'tu negocio' } ] } ] } } }}",
+        "options": {}
+      },
+      "id": "94fae8e7-3a87-4b67-83c9-cc9fc8407f9b",
+      "name": "Send WA FU2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -128,
+        432
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{$env.WHATSAPP_PHONE_NUMBER_ID}}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WHATSAPP_TOKEN}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { messaging_product: 'whatsapp', to: $node[\"Get leads for follow-up\"].json['phone'].toString().replace(/[^0-9]/g, ''), type: 'template', template: { name: 'novavision_followup3', language: { code: 'es' }, components: [ { type: 'body', parameters: [ { type: 'text', text: $node[\"Get leads for follow-up\"].json['name'] || 'Hola' } ] } ] } } }}",
+        "options": {}
+      },
+      "id": "0e16c347-aaae-4197-97a4-8be2af552317",
+      "name": "Send WA FU3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -128,
+        800
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "subject": "=Re: Tu tienda online para {{$node[\"Get leads for follow-up\"].json[\"category\"] || 'tu negocio'}}",
+        "message": "=Hola {{$node[\"Get leads for follow-up\"].json[\"name\"] || '¿cómo estás?'}}. Te escribí hace unos días sobre tu tienda online y quería saber si pudiste ver la info. ¿Cuál es hoy tu mayor problema con las ventas online (stock, cobros, web, etc.)?",
+        "toList": [
+          "={{ $node[\"Get leads for follow-up\"].json[\"email\"] }}"
+        ],
+        "additionalFields": {}
+      },
+      "id": "651aae2b-4056-4e12-8159-182843d55a92",
+      "name": "Send Email FU1",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        240
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yWIgAG6zWIonR54e",
+          "name": "Gmail account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "subject": "=Re: Tu tienda online en {{$node[\"Get leads for follow-up\"].json[\"city\"] || 'tu ciudad'}}",
+        "message": "=Hola {{$node[\"Get leads for follow-up\"].json[\"name\"] || '¿cómo estás?'}}. Hace unos días te conté de NovaVision. Ayudamos a negocios como el tuyo a centralizar stock, pedidos y cobros en un solo panel. Si querés, coordinamos una demo corta para ver si encaja.",
+        "toList": [
+          "={{ $node[\"Get leads for follow-up\"].json[\"email\"] }}"
+        ],
+        "additionalFields": {}
+      },
+      "id": "2292ba78-b8ad-4fff-b9a0-cf5cc335fb78",
+      "name": "Send Email FU2",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        592
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yWIgAG6zWIonR54e",
+          "name": "Gmail account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "subject": "=Último mensaje sobre tu tienda online",
+        "message": "=Hola {{$node[\"Get leads for follow-up\"].json[\"name\"] || '¿cómo estás?'}}. Este es mi último mensaje. Entiendo que estás a full; si en el futuro querés delegar la parte tecnológica de tu tienda para enfocarte en vender, en NovaVision te podemos ayudar. Si no respondés, no te vuelvo a escribir por este tema.",
+        "toList": [
+          "={{ $node[\"Get leads for follow-up\"].json[\"email\"] }}"
+        ],
+        "additionalFields": {}
+      },
+      "id": "d4e29963-9c1d-42b4-ad4a-435c752e3179",
+      "name": "Send Email FU3",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        976
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "yWIgAG6zWIonR54e",
+          "name": "Gmail account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "requestMethod": "PATCH",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/outreach_leads?id=eq.' + $node[\"Get leads for follow-up\"].json[\"id\"] }}",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ (() => { const lead = $node[\"Get leads for follow-up\"].json; const nextAttempt = (lead.attempt_count || 0) + 1; const body = { attempt_count: nextAttempt, last_contact_at: $now, last_channel: lead.last_channel || 'WHATSAPP' }; if (nextAttempt > 3) { body.status = 'COLD'; body.next_followup_at = null; } else { const days = nextAttempt === 2 ? 5 : 7; body.status = 'CONTACTED'; body.next_followup_at = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString(); } return body; })() }}",
+        "headerParametersJson": "={\"apikey\": \"{{$env.SUPABASE_SERVICE_ROLE}}\", \"Authorization\": \"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\", \"Content-Type\": \"application/json\", \"Prefer\": \"return=minimal\"}"
+      },
+      "id": "f17bbc4e-da57-47b1-8136-2db9bb8d27d9",
+      "name": "Update lead after FU",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        192,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/outreach_logs' }}",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ (() => { const lead = $node[\"Get leads for follow-up\"].json; const currentAttempt = lead.attempt_count || 1; return { lead_id: lead.id, channel: lead.last_channel || 'WHATSAPP', action: 'FOLLOW_UP', attempt: currentAttempt, error_message: $json.error?.message || null, raw: $json }; })() }}",
+        "headerParametersJson": "={\"apikey\": \"{{$env.SUPABASE_SERVICE_ROLE}}\", \"Authorization\": \"Bearer {{$env.SUPABASE_SERVICE_ROLE}}\", \"Content-Type\": \"application/json\", \"Prefer\": \"return=minimal\"}"
+      },
+      "id": "b4eb8334-7b83-42b4-8ecf-19dae4daeaab",
+      "name": "Log FU attempt",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        752,
+        528
+      ],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Daily Follow-ups": {
+      "main": [
+        [
+          {
+            "node": "Get leads for follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get leads for follow-up": {
+      "main": [
+        [
+          {
+            "node": "Attempt dispatcher",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attempt dispatcher": {
+      "main": [
+        [
+          {
+            "node": "Channel? (FU1)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Channel? (FU2)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Channel? (FU3)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Channel? (FU1)": {
+      "main": [
+        [
+          {
+            "node": "Send WA FU1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Email FU1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Channel? (FU2)": {
+      "main": [
+        [
+          {
+            "node": "Send WA FU2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Email FU2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Channel? (FU3)": {
+      "main": [
+        [
+          {
+            "node": "Send WA FU3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Email FU3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WA FU1": {
+      "main": [
+        [
+          {
+            "node": "Update lead after FU",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log FU attempt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WA FU2": {
+      "main": [
+        [
+          {
+            "node": "Update lead after FU",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log FU attempt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WA FU3": {
+      "main": [
+        [
+          {
+            "node": "Update lead after FU",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log FU attempt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email FU1": {
+      "main": [
+        [
+          {
+            "node": "Update lead after FU",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log FU attempt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email FU2": {
+      "main": [
+        [
+          {
+            "node": "Update lead after FU",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log FU attempt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email FU3": {
+      "main": [
+        [
+          {
+            "node": "Update lead after FU",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log FU attempt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "98a465d2095d2a078b1b18cec263ded6c699d7de61e2e25f223e8ca870ed6831"
+  }
+}

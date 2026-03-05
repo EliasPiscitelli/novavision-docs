@@ -5,8 +5,14 @@
       "parameters": {
         "rule": {
           "interval": [
-            { "triggerAtHour": 11, "triggerAtMinute": 0 },
-            { "triggerAtHour": 17, "triggerAtMinute": 0 }
+            {
+              "triggerAtHour": 11,
+              "triggerAtMinute": 0
+            },
+            {
+              "triggerAtHour": 17,
+              "triggerAtMinute": 0
+            }
           ]
         }
       },
@@ -14,37 +20,30 @@
       "name": "Cron Follow-ups",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            { "name": "select", "value": "id,name,email,phone,company,status,attempt_count,last_channel,conversation_stage,source" },
-            { "name": "status", "value": "eq.CONTACTED" },
-            { "name": "next_followup_at", "value": "=lte.{{$now.toISO()}}" },
-            { "name": "order", "value": "next_followup_at.asc" },
-            { "name": "limit", "value": "100" }
-          ]
-        },
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "options": {}
+        "operation": "executeQuery",
+        "query": "SELECT id, name, email, phone, company, status, attempt_count, last_channel, conversation_stage, source\nFROM outreach_leads\nWHERE status = 'CONTACTED'\n  AND next_followup_at <= NOW()\nORDER BY next_followup_at ASC\nLIMIT 100"
       },
       "id": "fu-fetch",
       "name": "Fetch FU Leads",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [220, 0],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "onError": "stopWorkflow"
     },
     {
@@ -56,7 +55,10 @@
       "name": "Loop Items",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -66,18 +68,26 @@
       "name": "Compute FU Number",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true },
+          "options": {
+            "caseSensitive": true
+          },
           "conditions": [
             {
               "id": "is-max",
               "leftValue": "={{$json.is_max_reached}}",
               "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equals" }
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -87,55 +97,51 @@
       "name": "Max Reached?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ]
     },
     {
       "parameters": {
-        "method": "PATCH",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads?id=eq.{{$json.id}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"status\": \"COLD\",\n  \"next_followup_at\": null,\n  \"lost_reason\": \"max_followups_exhausted\",\n  \"updated_at\": \"{{$now.toISO()}}\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "UPDATE outreach_leads\nSET status = 'COLD',\n    next_followup_at = NULL,\n    lost_reason = 'max_followups_exhausted',\n    updated_at = NOW()\nWHERE id = '{{ $json.id }}'\nRETURNING id"
       },
       "id": "fu-mark-cold",
       "name": "Mark COLD",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1100, -200],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1100,
+        -200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "onError": "stopWorkflow"
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_logs",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"lead_id\": {{$json.id}},\n  \"channel\": \"SYSTEM\",\n  \"action\": \"MARKED_COLD\",\n  \"direction\": \"OUTBOUND\",\n  \"attempt\": {{$json.fu_number}},\n  \"message_text\": \"Max follow-ups reached, marked COLD\",\n  \"processing_status\": \"processed\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "INSERT INTO outreach_logs (lead_id, channel, action, direction, attempt, message_text, processing_status)\nVALUES (\n  '{{ $node[\"Compute FU Number\"].json.id }}',\n  'SYSTEM', 'MARKED_COLD', 'OUTBOUND',\n  {{ $node[\"Compute FU Number\"].json.fu_number }},\n  'Max follow-ups reached, marked COLD',\n  'processed'\n)\nRETURNING id"
       },
       "id": "fu-log-cold",
       "name": "Log Marked COLD",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1320, -200],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1320,
+        -200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "continueOnFail": true
     },
     {
@@ -145,8 +151,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{$env.WHATSAPP_TOKEN}}" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WHATSAPP_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -158,125 +170,212 @@
       "name": "Send WA Follow-up",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1100, 100],
+      "position": [
+        1100,
+        100
+      ],
       "onError": "continueErrorOutput"
     },
     {
       "parameters": {
-        "method": "PATCH",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads?id=eq.{{$json.id}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=minimal" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"attempt_count\": {{$json.fu_number}},\n  \"last_channel\": \"WHATSAPP\",\n  \"last_contacted_at\": \"{{$now.toISO()}}\",\n  \"next_followup_at\": \"{{$now.plus($json.next_delay_days, 'days').toISO()}}\",\n  \"updated_at\": \"{{$now.toISO()}}\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "UPDATE outreach_leads\nSET attempt_count = {{ $node[\"Compute FU Number\"].json.fu_number }},\n    last_channel = 'WHATSAPP',\n    last_contacted_at = NOW(),\n    next_followup_at = NOW() + ({{ $node[\"Compute FU Number\"].json.next_delay_days }} * INTERVAL '1 day'),\n    updated_at = NOW()\nWHERE id = '{{ $node[\"Compute FU Number\"].json.id }}'\nRETURNING id"
       },
       "id": "fu-update-ok",
       "name": "Update Lead FU OK",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1320, 50],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1320,
+        50
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "onError": "stopWorkflow"
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_logs",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"lead_id\": {{$json.id}},\n  \"channel\": \"WHATSAPP\",\n  \"action\": \"FU_SENT\",\n  \"direction\": \"OUTBOUND\",\n  \"attempt\": {{$json.fu_number}},\n  \"message_text\": \"[TEMPLATE] {{$json.template_name}}\",\n  \"processing_status\": \"processed\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "INSERT INTO outreach_logs (lead_id, channel, action, direction, attempt, message_text, processing_status)\nVALUES (\n  '{{ $node[\"Compute FU Number\"].json.id }}',\n  'WHATSAPP', 'FU_SENT', 'OUTBOUND',\n  {{ $node[\"Compute FU Number\"].json.fu_number }},\n  '[TEMPLATE] ' || '{{ $node[\"Compute FU Number\"].json.template_name }}',\n  'processed'\n)\nRETURNING id"
       },
       "id": "fu-log-ok",
       "name": "Log FU Success",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1540, 50],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1540,
+        50
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "continueOnFail": true
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_logs",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
-            { "name": "Content-Type", "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"lead_id\": {{$json.id}},\n  \"channel\": \"WHATSAPP\",\n  \"action\": \"FU_FAILED\",\n  \"direction\": \"OUTBOUND\",\n  \"attempt\": {{$json.fu_number}},\n  \"error_message\": \"WA follow-up send failed\",\n  \"processing_status\": \"error\"\n}",
-        "options": {}
+        "operation": "executeQuery",
+        "query": "INSERT INTO outreach_logs (lead_id, channel, action, direction, attempt, error_message, processing_status)\nVALUES (\n  '{{ $node[\"Compute FU Number\"].json.id }}',\n  'WHATSAPP', 'FU_FAILED', 'OUTBOUND',\n  {{ $node[\"Compute FU Number\"].json.fu_number }},\n  'WA follow-up send failed',\n  'error'\n)\nRETURNING id"
       },
       "id": "fu-log-fail",
       "name": "Log FU Failure",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1320, 250],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1320,
+        250
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
       "continueOnFail": true
     }
   ],
   "connections": {
     "Cron Follow-ups": {
-      "main": [[{ "node": "Fetch FU Leads", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Fetch FU Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fetch FU Leads": {
-      "main": [[{ "node": "Loop Items", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Loop Items": {
       "main": [
-        [{ "node": "Compute FU Number", "type": "main", "index": 0 }],
+        [
+          {
+            "node": "Compute FU Number",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "Compute FU Number": {
-      "main": [[{ "node": "Max Reached?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Max Reached?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Max Reached?": {
       "main": [
-        [{ "node": "Mark COLD", "type": "main", "index": 0 }],
-        [{ "node": "Send WA Follow-up", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Mark COLD",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send WA Follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Mark COLD": {
-      "main": [[{ "node": "Log Marked COLD", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Log Marked COLD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Log Marked COLD": {
-      "main": [[{ "node": "Loop Items", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Send WA Follow-up": {
       "main": [
-        [{ "node": "Update Lead FU OK", "type": "main", "index": 0 }],
-        [{ "node": "Log FU Failure", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Update Lead FU OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log FU Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Update Lead FU OK": {
-      "main": [[{ "node": "Log FU Success", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Log FU Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Log FU Success": {
-      "main": [[{ "node": "Loop Items", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Log FU Failure": {
-      "main": [[{ "node": "Loop Items", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Loop Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "pinData": {},
@@ -286,8 +385,15 @@
     "callerPolicy": "workflowsFromSameOwner"
   },
   "staticData": null,
-  "tags": [{ "name": "outreach-v2" }, { "name": "followup" }],
+  "tags": [
+    {
+      "name": "outreach-v2"
+    },
+    {
+      "name": "followup"
+    }
+  ],
   "triggerCount": 1,
   "updatedAt": "2025-07-23T00:00:00.000Z",
-  "versionId": "fu-v2-001"
+  "versionId": "fu-v2-002-pg"
 }

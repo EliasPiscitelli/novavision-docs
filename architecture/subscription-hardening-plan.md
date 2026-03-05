@@ -31,10 +31,10 @@
 ## Jerarquía de planes (referencia inmutable del plan)
 
 ```
-starter ($20/m)  <  growth ($60/m)  <  enterprise ($250/m)
+starter ($20/m)  <  growth ($60/m)  <  enterprise ($390/m)
     │                  │                    │
     └── _annual        └── _annual          └── _annual
-        ($200/y)           ($600/y)             ($2500/y)
+        ($200/y)           ($600/y)             ($3500/y)
 ```
 
 **Regla de negocio:** Solo se permite **upgrade** (hacia arriba en la jerarquía). Nunca downgrade desde el client dashboard. El Super Admin podría forzar un cambio en cualquier dirección (caso excepcional con audit log).
