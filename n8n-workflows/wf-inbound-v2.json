@@ -1,0 +1,832 @@
+{
+  "name": "WF-INBOUND – WhatsApp Inbound + AI Closer v2",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wa-inbound",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "inbound-webhook",
+      "name": "Webhook WA Inbound",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "webhookId": "wa-inbound-v2"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\":\"ok\"}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "inbound-respond-ok",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst body = JSON.stringify($input.first().json.body || $input.first().json);\nconst sig = $input.first().json.headers?.['x-hub-signature-256'] || '';\nconst expected = 'sha256=' + crypto.createHmac('sha256', $env.WHATSAPP_APP_SECRET).update(body).digest('hex');\n\nif (sig !== expected) {\n  throw new Error('Invalid webhook signature');\n}\n\nreturn $input.all();"
+      },
+      "id": "inbound-verify-sig",
+      "name": "Verify Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst entry = body?.entry?.[0];\nconst changes = entry?.changes?.[0];\nconst value = changes?.value || {};\nconst msg = value?.messages?.[0];\nconst contact = value?.contacts?.[0];\n\nif (!msg) {\n  return [{ json: { is_status_update: true } }];\n}\n\nreturn [{\n  json: {\n    is_status_update: false,\n    wamid: msg.id,\n    from: msg.from,\n    msg_type: msg.type,\n    text: msg.text?.body || msg.button?.text || msg.interactive?.button_reply?.title || '',\n    contact_name: contact?.profile?.name || '',\n    phone_number_id: value.metadata?.phone_number_id || ''\n  }\n}];"
+      },
+      "id": "inbound-parse-msg",
+      "name": "Parse WA Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "status-check",
+              "leftValue": "={{$json.is_status_update}}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "inbound-is-status",
+      "name": "Is Status Update?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_logs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "wamid", "value": "=eq.{{$json.wamid}}" },
+            { "name": "select", "value": "id" },
+            { "name": "limit", "value": "1" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "inbound-check-dedup",
+      "name": "Check WAMID Dedup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "is-dup",
+              "leftValue": "={{Array.isArray($json) && $json.length > 0}}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "inbound-is-dup",
+      "name": "Already Processed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1320, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = ($input.first().json.text || '').toLowerCase().trim();\nconst OPT_OUT = ['stop','parar','basta','no más','no mas',\n  'cancelar suscripción','cancelar suscripcion','dejar de recibir',\n  'no me escriban','borrame','eliminarme','desuscribirme'];\n\nconst isOptOut = OPT_OUT.some(kw => text.includes(kw));\nreturn [{ json: { ...$input.first().json, is_opt_out: isOptOut } }];"
+      },
+      "id": "inbound-check-optout",
+      "name": "Check Opt-out",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "is-optout",
+              "leftValue": "={{$json.is_opt_out}}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "inbound-is-optout",
+      "name": "Is Opt-out?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1760, 200]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads?phone=eq.{{$json.from}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"LOST\",\n  \"lost_at\": \"{{$now.toISO()}}\",\n  \"lost_reason\": \"opt_out\",\n  \"bot_enabled\": false,\n  \"next_followup_at\": null,\n  \"updated_at\": \"{{$now.toISO()}}\"\n}",
+        "options": {}
+      },
+      "id": "inbound-mark-lost",
+      "name": "Mark Lead LOST",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, 100],
+      "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{$json.phone_number_id}}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{$env.WHATSAPP_TOKEN}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{$json.from}}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"Listo, no te vamos a escribir más. Si en algún momento querés saber más sobre NovaVision, escribinos cuando quieras. ¡Éxitos! 🙌\" }\n}",
+        "options": {}
+      },
+      "id": "inbound-send-optout-reply",
+      "name": "Send Opt-out Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, 100],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "phone", "value": "=eq.{{$json.from}}" },
+            { "name": "select", "value": "id,name,email,phone,company,status,conversation_stage,attempt_count,ai_state,bot_enabled,hot_lead,ai_engagement_score,account_id,onboarding_status" },
+            { "name": "limit", "value": "1" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "inbound-find-lead",
+      "name": "Find Lead by Phone",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, 350]
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = $input.first().json;\nconst lead = Array.isArray(results) ? results[0] : results;\nconst inboundData = $node['Check Opt-out'].json;\n\nif (lead && lead.id) {\n  return [{\n    json: {\n      lead_found: true,\n      lead: lead,\n      ...inboundData\n    }\n  }];\n} else {\n  return [{\n    json: {\n      lead_found: false,\n      lead: null,\n      ...inboundData\n    }\n  }];\n}"
+      },
+      "id": "inbound-lead-check",
+      "name": "Lead Found Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2200, 350]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "lead-found",
+              "leftValue": "={{$json.lead_found}}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "inbound-lead-found-if",
+      "name": "Lead Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2420, 350]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads?id=eq.{{$json.lead.id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"status\": \"IN_CONVERSATION\",\n  \"last_channel\": \"WHATSAPP\",\n  \"last_contacted_at\": \"{{$now.toISO()}}\",\n  \"updated_at\": \"{{$now.toISO()}}\"\n}",
+        "options": {}
+      },
+      "id": "inbound-update-lead",
+      "name": "Update Lead IN_CONV",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2640, 250]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation,resolution=merge-duplicates" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"{{$json.contact_name || 'Desconocido'}}\",\n  \"phone\": \"{{$json.from}}\",\n  \"status\": \"IN_CONVERSATION\",\n  \"source\": \"INBOUND_WA\",\n  \"conversation_stage\": \"INTRO\",\n  \"last_channel\": \"WHATSAPP\",\n  \"last_contacted_at\": \"{{$now.toISO()}}\",\n  \"attempt_count\": 0,\n  \"bot_enabled\": true\n}",
+        "options": {}
+      },
+      "id": "inbound-create-lead",
+      "name": "Create Inbound Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2640, 450]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": {{$json.lead?.id || $json[0]?.id || 0}},\n  \"channel\": \"WHATSAPP\",\n  \"action\": \"INBOUND_MSG\",\n  \"direction\": \"INBOUND\",\n  \"wamid\": \"{{$json.wamid || $node['Check Opt-out'].json.wamid}}\",\n  \"msg_type\": \"{{$json.msg_type || $node['Check Opt-out'].json.msg_type}}\",\n  \"from_name\": \"{{$json.contact_name || $node['Check Opt-out'].json.contact_name}}\",\n  \"from_phone\": \"{{$json.from || $node['Check Opt-out'].json.from}}\",\n  \"message_text\": \"{{$json.text || $node['Check Opt-out'].json.text}}\",\n  \"processing_status\": \"processed\"\n}",
+        "options": {}
+      },
+      "id": "inbound-log-msg",
+      "name": "Log Inbound Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2860, 350],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_logs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "lead_id", "value": "=eq.{{$json.lead?.id || $json[0]?.id}}" },
+            { "name": "select", "value": "direction,message_text,created_at" },
+            { "name": "order", "value": "created_at.desc" },
+            { "name": "limit", "value": "10" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "inbound-get-history",
+      "name": "Get Conversation History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3080, 350]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cache = $getWorkflowStaticData('global');\nconst now = Date.now();\nconst PLAYBOOK_TTL = 12 * 60 * 60 * 1000;\n\nlet needsPlaybook = !cache.playbook || (now - (cache.playbook_ts || 0) > PLAYBOOK_TTL);\n\nreturn [{\n  json: {\n    needs_playbook: needsPlaybook,\n    cached_playbook: cache.playbook || null,\n    ...$input.first().json\n  }\n}];"
+      },
+      "id": "inbound-check-cache",
+      "name": "Check Config Cache",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3300, 350]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/nv_playbook",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "active", "value": "eq.true" },
+            { "name": "select", "value": "key,segment,stage,type,title,content,priority,topic" },
+            { "name": "order", "value": "priority.asc" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "inbound-get-playbook",
+      "name": "Get NV Playbook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3520, 250]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_config",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "key", "value": "=in.(coupon_enabled,coupon_offer_stage,coupon_default_code,coupon_offer_message)" },
+            { "name": "select", "value": "key,value" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "inbound-fetch-coupon-config",
+      "name": "Fetch Coupon Config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3740, 250]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_coupons",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "active", "value": "eq.true" },
+            { "name": "select", "value": "id,code,description,discount_type,discount_value,valid_until,max_uses,current_uses" },
+            { "name": "order", "value": "created_at.asc" },
+            { "name": "limit", "value": "5" }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "inbound-fetch-active-coupons",
+      "name": "Fetch Active Coupons",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3960, 250]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build system prompt dynamically from playbook + coupons\nconst playbook = $node['Get NV Playbook'].json || [];\nconst playbookArr = Array.isArray(playbook) ? playbook : [];\n\n// Cache the playbook\nconst cache = $getWorkflowStaticData('global');\ncache.playbook = playbookArr;\ncache.playbook_ts = Date.now();\n\n// --- Coupon data ---\nconst couponConfigRaw = $node['Fetch Coupon Config'].json || [];\nconst couponConfigArr = Array.isArray(couponConfigRaw) ? couponConfigRaw : [];\nconst cfgMap = {};\ncouponConfigArr.forEach(c => cfgMap[c.key] = c.value);\n\nconst couponEnabled = cfgMap.coupon_enabled === 'true';\nconst couponOfferStage = cfgMap.coupon_offer_stage || 'closing';\nconst couponOfferMessage = cfgMap.coupon_offer_message || '';\n\nconst activeCouponsRaw = $node['Fetch Active Coupons'].json || [];\nconst couponsArr = Array.isArray(activeCouponsRaw) ? activeCouponsRaw : [];\nconst validCoupons = couponsArr.filter(c => !c.max_uses || (c.current_uses || 0) < c.max_uses);\n\n// --- Base prompt ---\nconst BASE_PROMPT = `Sos NovaBot, asistente de ventas de NovaVision.\nNovaVision ofrece tiendas online llave en mano para pymes argentinas.\n\nREGLAS ABSOLUTAS:\n1. NUNCA inventar precios. Usar SOLO los del PRICING recibido.\n2. NUNCA mencionar montos en USD al lead. Solo ARS.\n3. Máximo 3 mensajes seguidos del bot sin respuesta del lead → dejar de insistir.\n4. Si el lead dice \"no\" claramente → respetar y despedirse amablemente.\n5. Si el lead pide hablar con un humano → decir que un asesor se comunicará pronto.\n6. Responder SIEMPRE en español argentino informal pero profesional.\n7. Mensajes cortos (máx 300 chars) para WhatsApp.\n\nOBJETIVO: Llevar al lead a iniciar su tienda gratuita en el builder.\nURL del builder: https://novavision.com.ar/builder\n\nFORMATO DE RESPUESTA (JSON estricto):\n{\n  \"reply\": \"texto del mensaje\",\n  \"engagement_delta\": -10 a +20,\n  \"conversation_stage\": \"INTRO|DISCOVERY|FOLLOWUP|CLOSING|DEMO_OFFERED\",\n  \"intent\": \"interested|curious|objection|not_interested|spam|human_request\",\n  \"should_notify_sales\": true/false,\n  \"coupon_code_offered\": \"CÓDIGO\" o null,\n  \"reasoning\": \"explicación interna\"\n}`;\n\nconst sections = playbookArr\n  .sort((a, b) => (a.priority || 0) - (b.priority || 0))\n  .map(p => `### ${p.title}\\n${p.content}`)\n  .join('\\n\\n');\n\n// --- Coupon section for prompt ---\nlet couponSection = '';\nif (couponEnabled && validCoupons.length > 0) {\n  const couponList = validCoupons.map(c => {\n    const desc = c.discount_type === 'percent'\n      ? `${c.discount_value}% de descuento`\n      : c.discount_type === 'free_setup'\n        ? 'Setup GRATIS'\n        : `$${c.discount_value} de descuento`;\n    return `- Código: ${c.code} → ${desc}. ${c.description || ''}`;\n  }).join('\\n');\n\n  couponSection = `\\n\\n## CUPONES DISPONIBLES\\nTenés cupones de descuento para ofrecer como incentivo de cierre.\\n\\nREGLAS DE CUPONES:\\n1. Ofrecer cupón SOLO cuando la conversación esté en stage \"${couponOfferStage}\" o superior (CLOSING, DEMO_OFFERED).\\n2. NO ofrecer cupón en la primera interacción ni en INTRO/DISCOVERY.\\n3. Ofrecer cupón cuando el lead muestre objeciones de precio o dude en contratar.\\n4. Máximo 1 cupón por conversación. Si CUPÓN YA OFRECIDO = SÍ, NO repetir.\\n5. Cuando ofrezcas un cupón, poné el código en \"coupon_code_offered\".\\n6. Si NO ofrecés cupón, dejá \"coupon_code_offered\": null.\\n${couponOfferMessage ? 'MENSAJE SUGERIDO: ' + couponOfferMessage + '\\n' : ''}\\nCUPONES ACTIVOS:\\n${couponList}`;\n} else {\n  couponSection = '\\n\\n## CUPONES\\nNo hay cupones disponibles. Dejá \"coupon_code_offered\": null siempre.';\n}\n\nconst fullPrompt = BASE_PROMPT + '\\n\\n## PLAYBOOK\\n' + (sections || '(sin playbook)') + couponSection;\n\nreturn [{ json: { system_prompt: fullPrompt, coupon_enabled: couponEnabled, valid_coupons: validCoupons } }];"
+      },
+      "id": "inbound-build-prompt",
+      "name": "Build AI Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4180, 350]
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $node['Lead Found Check'].json.lead || {};\nconst inbound = $node['Check Opt-out'].json;\nconst history = $node['Get Conversation History'].json || [];\nconst historyArr = Array.isArray(history) ? history : [];\nconst promptData = $node['Build AI Prompt'].json || {};\n\nconst botEnabled = lead.bot_enabled !== false;\n\nconst historyText = historyArr\n  .reverse()\n  .map(h => `${h.direction}: ${h.message_text}`)\n  .join('\\n');\n\n// Check if coupon was already offered in conversation history\nconst couponCodes = (promptData.valid_coupons || []).map(c => c.code);\nconst couponAlreadyOffered = historyArr.some(h =>\n  h.direction === 'BOT' && h.message_text &&\n  (couponCodes.some(code => h.message_text.includes(code)) || h.message_text.toLowerCase().includes('cupón'))\n);\n\nreturn [{\n  json: {\n    bot_enabled: botEnabled,\n    lead_id: lead.id,\n    lead_name: lead.name || inbound.contact_name,\n    lead_company: lead.company || '',\n    lead_status: lead.status || 'IN_CONVERSATION',\n    conversation_stage: lead.conversation_stage || 'INTRO',\n    ai_engagement_score: lead.ai_engagement_score || 0,\n    account_id: lead.account_id || null,\n    input_text: inbound.text,\n    conversation_history: historyText,\n    from: inbound.from,\n    wamid: inbound.wamid,\n    phone_number_id: inbound.phone_number_id,\n    coupon_enabled: promptData.coupon_enabled || false,\n    coupon_already_offered: couponAlreadyOffered,\n    valid_coupons: promptData.valid_coupons || []\n  }\n}];"
+      },
+      "id": "inbound-prepare-context",
+      "name": "Prepare AI Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4400, 350]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "bot-on",
+              "leftValue": "={{$json.bot_enabled}}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "inbound-bot-enabled",
+      "name": "Bot Enabled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [4620, 350]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "message",
+        "modelId": { "__rl": true, "value": "gpt-4.1-mini", "mode": "list" },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "={{$node['Build AI Prompt'].json.system_prompt}}"
+            },
+            {
+              "role": "user",
+              "content": "=LEAD: {{$json.lead_name}} ({{$json.lead_company || 'sin empresa'}})\nSTATUS: {{$json.lead_status}} | STAGE: {{$json.conversation_stage}}\nENGAGEMENT: {{$json.ai_engagement_score}}/100\nCUPÓN HABILITADO: {{$json.coupon_enabled ? 'SÍ' : 'NO'}}\nCUPÓN YA OFRECIDO: {{$json.coupon_already_offered ? 'SÍ (no repetir)' : 'NO'}}\n\nHISTORIAL:\n{{$json.conversation_history}}\n---\nMENSAJE: {{$json.input_text}}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 500
+        }
+      },
+      "id": "inbound-ai-closer",
+      "name": "AI Closer Brain",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [4840, 250],
+      "credentials": {
+        "openAiApi": {
+          "id": "CONFIGURE_ME",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nlet aiOutput;\n\ntry {\n  const content = raw.message?.content || raw.choices?.[0]?.message?.content || '';\n  const cleaned = content.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  aiOutput = JSON.parse(cleaned);\n} catch (e) {\n  aiOutput = {\n    reply: 'Hola! Gracias por escribirnos. Un asesor te va a contactar pronto 🙌',\n    engagement_delta: 0,\n    conversation_stage: null,\n    intent: 'unknown',\n    should_notify_sales: false,\n    coupon_code_offered: null,\n    reasoning: 'JSON parse failed: ' + e.message\n  };\n}\n\n// Guardrails\nlet reply = (aiOutput.reply || '').substring(0, 1000);\nconst engDelta = Math.max(-10, Math.min(20, parseInt(aiOutput.engagement_delta) || 0));\nconst validStages = ['INTRO','DISCOVERY','FOLLOWUP','CLOSING','DEMO_OFFERED','DEMO_BOOKED'];\nconst stage = validStages.includes(aiOutput.conversation_stage) ? aiOutput.conversation_stage : null;\n\n// Remove USD amounts\nif (reply && /\\bU[S$]{1,2}D?\\s*\\d/i.test(reply)) {\n  reply = reply.replace(/U[S$]{1,2}D?\\s*[\\d.,]+/gi, '[consultar precio]');\n}\n\nconst prevContext = $node['Prepare AI Context'].json;\nconst newScore = Math.max(0, Math.min(100, (prevContext.ai_engagement_score || 0) + engDelta));\nconst isHot = newScore >= 80 || aiOutput.should_notify_sales;\n\n// --- Coupon handling ---\nconst couponOffered = aiOutput.coupon_code_offered || null;\nconst validCoupons = prevContext.valid_coupons || [];\nlet couponId = null;\nif (couponOffered && validCoupons.length > 0) {\n  const match = validCoupons.find(c => c.code === couponOffered);\n  couponId = match ? match.id : null;\n}\n\nreturn [{\n  json: {\n    reply: reply,\n    engagement_delta: engDelta,\n    new_score: newScore,\n    new_stage: stage,\n    intent: aiOutput.intent || 'unknown',\n    should_notify_sales: !!aiOutput.should_notify_sales,\n    is_hot: isHot,\n    reasoning: aiOutput.reasoning || '',\n    lead_id: prevContext.lead_id,\n    from: prevContext.from,\n    wamid: prevContext.wamid,\n    phone_number_id: prevContext.phone_number_id,\n    account_id: prevContext.account_id,\n    coupon_code_offered: couponOffered,\n    coupon_id: couponId\n  }\n}];"
+      },
+      "id": "inbound-post-process",
+      "name": "Post-process AI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [5060, 250]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "coupon-check",
+              "leftValue": "={{$json.coupon_id != null && $json.coupon_id !== ''}}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "inbound-check-coupon-offered",
+      "name": "Coupon Offered?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [5280, 250]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_coupon_offers",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": {{$json.lead_id}},\n  \"coupon_id\": \"{{$json.coupon_id}}\"\n}",
+        "options": {}
+      },
+      "id": "inbound-log-coupon-offer",
+      "name": "Log Coupon Offer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [5500, 150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_leads?id=eq.{{$json.lead_id}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"ai_engagement_score\": {{$json.new_score}},\n  \"conversation_stage\": \"{{$json.new_stage || $node['Prepare AI Context'].json.conversation_stage}}\",\n  \"hot_lead\": {{$json.is_hot}},\n  \"updated_at\": \"{{$now.toISO()}}\"\n}",
+        "options": {}
+      },
+      "id": "inbound-update-intel",
+      "name": "Update Lead Intelligence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [5720, 250]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "is-hot",
+              "leftValue": "={{$json.is_hot}}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "inbound-is-hot",
+      "name": "Is Hot Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [5940, 250]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{$env.WHATSAPP_PHONE_NUMBER_ID}}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{$env.WHATSAPP_TOKEN}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{$env.SALES_ALERT_PHONE}}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"🔥 HOT LEAD\\nNombre: {{$node['Prepare AI Context'].json.lead_name}}\\nTeléfono: {{$json.from}}\\nScore: {{$json.new_score}}/100\\nIntent: {{$json.intent}}\\nÚltimo msg: {{$node['Prepare AI Context'].json.input_text}}\" }\n}",
+        "options": {}
+      },
+      "id": "inbound-notify-sales",
+      "name": "Notify Sales (Hot Lead)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [6160, 150],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Humanize delay: random 3-12 seconds\nconst delay = Math.floor(Math.random() * 9000) + 3000;\nawait new Promise(r => setTimeout(r, delay));\nreturn $input.all();"
+      },
+      "id": "inbound-humanize",
+      "name": "Humanize Delay",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [6380, 250]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{$json.phone_number_id}}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{$env.WHATSAPP_TOKEN}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{$json.from}}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"{{$json.reply}}\" }\n}",
+        "options": {}
+      },
+      "id": "inbound-send-reply",
+      "name": "Send WA Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [6600, 250],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/outreach_logs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Authorization", "value": "=Bearer {{$env.SUPABASE_SERVICE_ROLE}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"lead_id\": {{$json.lead_id || $node['Post-process AI'].json.lead_id}},\n  \"channel\": \"WHATSAPP\",\n  \"action\": \"BOT_REPLY\",\n  \"direction\": \"BOT\",\n  \"wamid\": \"{{$json.messages ? $json.messages[0].id : null}}\",\n  \"message_text\": \"{{$node['Post-process AI'].json.reply}}\",\n  \"ai_state\": {{JSON.stringify({ intent: $node['Post-process AI'].json.intent, score: $node['Post-process AI'].json.new_score, stage: $node['Post-process AI'].json.new_stage, reasoning: $node['Post-process AI'].json.reasoning, coupon_offered: $node['Post-process AI'].json.coupon_code_offered })}},\n  \"processing_status\": \"processed\"\n}",
+        "options": {}
+      },
+      "id": "inbound-log-reply",
+      "name": "Log Bot Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [6820, 250],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Webhook WA Inbound": {
+      "main": [[{ "node": "Respond 200 OK", "type": "main", "index": 0 }]]
+    },
+    "Respond 200 OK": {
+      "main": [[{ "node": "Verify Signature", "type": "main", "index": 0 }]]
+    },
+    "Verify Signature": {
+      "main": [[{ "node": "Parse WA Message", "type": "main", "index": 0 }]]
+    },
+    "Parse WA Message": {
+      "main": [[{ "node": "Is Status Update?", "type": "main", "index": 0 }]]
+    },
+    "Is Status Update?": {
+      "main": [
+        [],
+        [{ "node": "Check WAMID Dedup", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check WAMID Dedup": {
+      "main": [[{ "node": "Already Processed?", "type": "main", "index": 0 }]]
+    },
+    "Already Processed?": {
+      "main": [
+        [],
+        [{ "node": "Check Opt-out", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Opt-out": {
+      "main": [[{ "node": "Is Opt-out?", "type": "main", "index": 0 }]]
+    },
+    "Is Opt-out?": {
+      "main": [
+        [{ "node": "Mark Lead LOST", "type": "main", "index": 0 }],
+        [{ "node": "Find Lead by Phone", "type": "main", "index": 0 }]
+      ]
+    },
+    "Mark Lead LOST": {
+      "main": [[{ "node": "Send Opt-out Reply", "type": "main", "index": 0 }]]
+    },
+    "Find Lead by Phone": {
+      "main": [[{ "node": "Lead Found Check", "type": "main", "index": 0 }]]
+    },
+    "Lead Found Check": {
+      "main": [[{ "node": "Lead Found?", "type": "main", "index": 0 }]]
+    },
+    "Lead Found?": {
+      "main": [
+        [{ "node": "Update Lead IN_CONV", "type": "main", "index": 0 }],
+        [{ "node": "Create Inbound Lead", "type": "main", "index": 0 }]
+      ]
+    },
+    "Update Lead IN_CONV": {
+      "main": [[{ "node": "Log Inbound Message", "type": "main", "index": 0 }]]
+    },
+    "Create Inbound Lead": {
+      "main": [[{ "node": "Log Inbound Message", "type": "main", "index": 0 }]]
+    },
+    "Log Inbound Message": {
+      "main": [[{ "node": "Get Conversation History", "type": "main", "index": 0 }]]
+    },
+    "Get Conversation History": {
+      "main": [[{ "node": "Check Config Cache", "type": "main", "index": 0 }]]
+    },
+    "Check Config Cache": {
+      "main": [[{ "node": "Get NV Playbook", "type": "main", "index": 0 }]]
+    },
+    "Get NV Playbook": {
+      "main": [[{ "node": "Fetch Coupon Config", "type": "main", "index": 0 }]]
+    },
+    "Fetch Coupon Config": {
+      "main": [[{ "node": "Fetch Active Coupons", "type": "main", "index": 0 }]]
+    },
+    "Fetch Active Coupons": {
+      "main": [[{ "node": "Build AI Prompt", "type": "main", "index": 0 }]]
+    },
+    "Build AI Prompt": {
+      "main": [[{ "node": "Prepare AI Context", "type": "main", "index": 0 }]]
+    },
+    "Prepare AI Context": {
+      "main": [[{ "node": "Bot Enabled?", "type": "main", "index": 0 }]]
+    },
+    "Bot Enabled?": {
+      "main": [
+        [{ "node": "AI Closer Brain", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "AI Closer Brain": {
+      "main": [[{ "node": "Post-process AI", "type": "main", "index": 0 }]]
+    },
+    "Post-process AI": {
+      "main": [[{ "node": "Coupon Offered?", "type": "main", "index": 0 }]]
+    },
+    "Coupon Offered?": {
+      "main": [
+        [{ "node": "Log Coupon Offer", "type": "main", "index": 0 }],
+        [{ "node": "Update Lead Intelligence", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log Coupon Offer": {
+      "main": [[{ "node": "Update Lead Intelligence", "type": "main", "index": 0 }]]
+    },
+    "Update Lead Intelligence": {
+      "main": [[{ "node": "Is Hot Lead?", "type": "main", "index": 0 }]]
+    },
+    "Is Hot Lead?": {
+      "main": [
+        [{ "node": "Notify Sales (Hot Lead)", "type": "main", "index": 0 }],
+        [{ "node": "Humanize Delay", "type": "main", "index": 0 }]
+      ]
+    },
+    "Notify Sales (Hot Lead)": {
+      "main": [[{ "node": "Humanize Delay", "type": "main", "index": 0 }]]
+    },
+    "Humanize Delay": {
+      "main": [[{ "node": "Send WA Reply", "type": "main", "index": 0 }]]
+    },
+    "Send WA Reply": {
+      "main": [
+        [{ "node": "Log Bot Reply", "type": "main", "index": 0 }],
+        [{ "node": "Log Bot Reply", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [{ "name": "outreach-v2" }, { "name": "inbound" }, { "name": "ai-closer" }, { "name": "coupons" }],
+  "triggerCount": 1,
+  "updatedAt": "2025-07-23T00:00:00.000Z",
+  "versionId": "inbound-v2-002"
+}

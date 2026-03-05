@@ -1,0 +1,206 @@
+{
+  "name": "WF-WEEKLY-REPORT – Reporte Semanal Outreach",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 12 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "report-trigger",
+      "name": "Lunes 12:00 UTC (9:00 ART)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  count(*) FILTER (WHERE status = 'NEW') as funnel_new,\n  count(*) FILTER (WHERE status = 'CONTACTED') as funnel_contacted,\n  count(*) FILTER (WHERE status = 'IN_CONVERSATION') as funnel_in_conv,\n  count(*) FILTER (WHERE status = 'QUALIFIED') as funnel_qualified,\n  count(*) FILTER (WHERE status = 'ONBOARDING') as funnel_onboarding,\n  count(*) FILTER (WHERE status = 'WON') as funnel_won,\n  count(*) FILTER (WHERE status = 'COLD') as funnel_cold,\n  count(*) FILTER (WHERE status = 'LOST') as funnel_lost,\n  count(*) FILTER (WHERE status = 'DISCARDED') as funnel_discarded,\n  count(*) as total\nFROM outreach_leads;",
+        "options": {}
+      },
+      "id": "report-funnel",
+      "name": "Funnel Snapshot",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [220, -200],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  count(*) FILTER (WHERE status = 'CONTACTED' AND updated_at > now() - interval '7 days') as contacted_this_week,\n  count(*) FILTER (WHERE status = 'IN_CONVERSATION' AND updated_at > now() - interval '7 days') as conversations_this_week,\n  count(*) FILTER (WHERE status = 'QUALIFIED' AND qualified_at > now() - interval '7 days') as qualified_this_week,\n  count(*) FILTER (WHERE status = 'ONBOARDING' AND updated_at > now() - interval '7 days') as onboarding_this_week,\n  count(*) FILTER (WHERE status = 'WON' AND won_at > now() - interval '7 days') as won_this_week,\n  count(*) FILTER (WHERE status = 'LOST' AND lost_at > now() - interval '7 days') as lost_this_week,\n  count(*) FILTER (WHERE hot_lead = true AND status NOT IN ('WON','LOST','COLD','DISCARDED')) as hot_leads_active\nFROM outreach_leads;",
+        "options": {}
+      },
+      "id": "report-weekly-activity",
+      "name": "Actividad Semanal",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [220, 0],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  count(*) FILTER (WHERE direction = 'outbound') as msgs_sent_week,\n  count(*) FILTER (WHERE direction = 'inbound') as msgs_received_week,\n  count(DISTINCT lead_id) FILTER (WHERE direction = 'inbound') as unique_responders,\n  count(*) FILTER (WHERE direction = 'outbound' AND channel = 'whatsapp') as wa_sent,\n  count(*) FILTER (WHERE processing_status = 'error') as errors_week\nFROM outreach_logs\nWHERE created_at > now() - interval '7 days';",
+        "options": {}
+      },
+      "id": "report-messaging",
+      "name": "Metricas Mensajeria",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [220, 200],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  ROUND(\n    count(*) FILTER (WHERE status = 'WON')::numeric / \n    NULLIF(count(*) FILTER (WHERE status != 'NEW'), 0) * 100, 2\n  ) as conversion_rate,\n  ROUND(\n    count(*) FILTER (WHERE status IN ('IN_CONVERSATION','QUALIFIED','ONBOARDING'))::numeric / \n    NULLIF(count(*) FILTER (WHERE status = 'CONTACTED'), 0) * 100, 2\n  ) as engagement_rate,\n  ROUND(AVG(ai_engagement_score) FILTER (WHERE ai_engagement_score > 0), 1) as avg_ai_score,\n  ROUND(AVG(followup_count) FILTER (WHERE status = 'WON'), 1) as avg_followups_to_win\nFROM outreach_leads;",
+        "options": {}
+      },
+      "id": "report-kpis",
+      "name": "KPIs Conversion",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [220, 400],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT name, phone, email, status, ai_engagement_score, hot_lead, updated_at\nFROM outreach_leads\nWHERE hot_lead = true\n  AND status NOT IN ('WON', 'LOST', 'COLD', 'DISCARDED')\nORDER BY ai_engagement_score DESC\nLIMIT 10;",
+        "options": {}
+      },
+      "id": "report-hot-leads",
+      "name": "Top Hot Leads",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [220, 600],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "mergeByFields": {
+          "values": []
+        },
+        "combinationMode": "multiplex",
+        "options": {}
+      },
+      "id": "report-merge",
+      "name": "Merge All Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [500, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const funnel = $input.all()[0]?.json || {};\nconst activity = $input.all()[1]?.json || {};\nconst msgs = $input.all()[2]?.json || {};\nconst kpis = $input.all()[3]?.json || {};\n\nconst today = new Date().toLocaleDateString('es-AR', {dateStyle:'long'});\n\nconst report = `📊 *REPORTE SEMANAL OUTREACH – ${today}*\n\n🔢 *FUNNEL ACTUAL*\n├ 🆕 NEW: ${funnel.funnel_new || 0}\n├ 📞 CONTACTED: ${funnel.funnel_contacted || 0}\n├ 💬 IN_CONVERSATION: ${funnel.funnel_in_conv || 0}\n├ ⭐ QUALIFIED: ${funnel.funnel_qualified || 0}\n├ 🏗️ ONBOARDING: ${funnel.funnel_onboarding || 0}\n├ 🏆 WON: ${funnel.funnel_won || 0}\n├ 🥶 COLD: ${funnel.funnel_cold || 0}\n├ ❌ LOST: ${funnel.funnel_lost || 0}\n└ 🗑️ DISCARDED: ${funnel.funnel_discarded || 0}\n\n📈 *ACTIVIDAD ESTA SEMANA*\n├ Contactados: ${activity.contacted_this_week || 0}\n├ Conversaciones: ${activity.conversations_this_week || 0}\n├ Calificados: ${activity.qualified_this_week || 0}\n├ En Onboarding: ${activity.onboarding_this_week || 0}\n├ Ganados: ${activity.won_this_week || 0}\n├ Perdidos: ${activity.lost_this_week || 0}\n└ Hot Leads activos: ${activity.hot_leads_active || 0}\n\n📨 *MENSAJERIA (7d)*\n├ Enviados: ${msgs.msgs_sent_week || 0}\n├ Recibidos: ${msgs.msgs_received_week || 0}\n├ Respondedores únicos: ${msgs.unique_responders || 0}\n└ Errores: ${msgs.errors_week || 0}\n\n🎯 *KPIs*\n├ Conversion Rate: ${kpis.conversion_rate || 0}%\n├ Engagement Rate: ${kpis.engagement_rate || 0}%\n├ Avg AI Score: ${kpis.avg_ai_score || 'N/A'}\n└ Avg Follow-ups to Win: ${kpis.avg_followups_to_win || 'N/A'}`;\n\nreturn [{ json: { report, ...funnel, ...activity, ...msgs, ...kpis } }];"
+      },
+      "id": "report-format",
+      "name": "Formatear Reporte",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $env.SALES_ALERT_PHONE }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": {{ JSON.stringify($json.report) }} }\n}",
+        "options": {}
+      },
+      "id": "report-send-wa",
+      "name": "Enviar por WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 200]
+    }
+  ],
+  "connections": {
+    "Lunes 12:00 UTC (9:00 ART)": {
+      "main": [
+        [
+          { "node": "Funnel Snapshot", "type": "main", "index": 0 },
+          { "node": "Actividad Semanal", "type": "main", "index": 0 },
+          { "node": "Metricas Mensajeria", "type": "main", "index": 0 },
+          { "node": "KPIs Conversion", "type": "main", "index": 0 },
+          { "node": "Top Hot Leads", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Funnel Snapshot": {
+      "main": [
+        [{ "node": "Merge All Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Actividad Semanal": {
+      "main": [
+        [{ "node": "Merge All Data", "type": "main", "index": 1 }]
+      ]
+    },
+    "Metricas Mensajeria": {
+      "main": [
+        [{ "node": "Merge All Data", "type": "main", "index": 2 }]
+      ]
+    },
+    "KPIs Conversion": {
+      "main": [
+        [{ "node": "Merge All Data", "type": "main", "index": 3 }]
+      ]
+    },
+    "Top Hot Leads": {
+      "main": [
+        [{ "node": "Formatear Reporte", "type": "main", "index": 0 }]
+      ]
+    },
+    "Merge All Data": {
+      "main": [
+        [{ "node": "Formatear Reporte", "type": "main", "index": 0 }]
+      ]
+    },
+    "Formatear Reporte": {
+      "main": [
+        [{ "node": "Enviar por WhatsApp", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Cron Lunes 9:00 ART. Genera reporte semanal con: funnel snapshot, actividad 7d, métricas de mensajería, KPIs de conversión, top hot leads. Envía por WhatsApp al número de alertas.",
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    { "name": "outreach" },
+    { "name": "report" },
+    { "name": "v2" }
+  ]
+}

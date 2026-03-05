@@ -1,0 +1,160 @@
+{
+  "name": "WF-HYGIENE – Mantenimiento Diario",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "hygiene-trigger",
+      "name": "Cron 06:00 UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT value::int as days FROM outreach_config WHERE key = 'cold_after_days'",
+        "options": {}
+      },
+      "id": "hygiene-get-config",
+      "name": "Leer Config",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [220, 0],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH cold_candidates AS (\n  UPDATE outreach_leads\n  SET status = 'COLD',\n      lost_reason = 'Auto-COLD: sin actividad > ' || {{ $json.days || 14 }} || ' dias',\n      updated_at = now()\n  WHERE status IN ('CONTACTED', 'IN_CONVERSATION')\n    AND updated_at < now() - ({{ $json.days || 14 }} || ' days')::interval\n    AND followup_count >= (SELECT COALESCE(value::int, 4) FROM outreach_config WHERE key = 'max_followup_attempts')\n  RETURNING id\n)\nSELECT count(*) as cold_count FROM cold_candidates;",
+        "options": {}
+      },
+      "id": "hygiene-auto-cold",
+      "name": "Auto-COLD Inactivos",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [440, -100],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH discarded AS (\n  UPDATE outreach_leads\n  SET status = 'DISCARDED',\n      lost_reason = 'Auto-DISCARD: telefono invalido',\n      updated_at = now()\n  WHERE status = 'NEW'\n    AND (phone IS NULL OR phone = '' OR length(phone) < 8\n         OR phone !~ '^\\+?[1-9][0-9]{7,14}$')\n  RETURNING id\n)\nSELECT count(*) as discard_count FROM discarded;",
+        "options": {}
+      },
+      "id": "hygiene-discard-invalid",
+      "name": "Descartar Phones Inválidos",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [440, 100],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH dedup AS (\n  SELECT id, ROW_NUMBER() OVER (PARTITION BY phone ORDER BY created_at ASC) as rn\n  FROM outreach_leads\n  WHERE phone IS NOT NULL AND phone != ''\n    AND status NOT IN ('DISCARDED', 'WON')\n),\nduplicates AS (\n  UPDATE outreach_leads\n  SET status = 'DISCARDED',\n      lost_reason = 'Auto-DISCARD: duplicado por phone',\n      updated_at = now()\n  WHERE id IN (SELECT id FROM dedup WHERE rn > 1)\n  RETURNING id\n)\nSELECT count(*) as dedup_count FROM duplicates;",
+        "options": {}
+      },
+      "id": "hygiene-dedup",
+      "name": "De-duplicar por Phone",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [440, 300],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  (SELECT count(*) FROM outreach_leads WHERE status = 'NEW') as total_new,\n  (SELECT count(*) FROM outreach_leads WHERE status = 'CONTACTED') as total_contacted,\n  (SELECT count(*) FROM outreach_leads WHERE status = 'IN_CONVERSATION') as total_in_conv,\n  (SELECT count(*) FROM outreach_leads WHERE status = 'QUALIFIED') as total_qualified,\n  (SELECT count(*) FROM outreach_leads WHERE status = 'ONBOARDING') as total_onboarding,\n  (SELECT count(*) FROM outreach_leads WHERE status = 'WON') as total_won,\n  (SELECT count(*) FROM outreach_leads WHERE status = 'COLD') as total_cold,\n  (SELECT count(*) FROM outreach_leads WHERE status = 'LOST') as total_lost,\n  (SELECT count(*) FROM outreach_leads WHERE status = 'DISCARDED') as total_discarded,\n  (SELECT count(*) FROM outreach_leads) as grand_total;",
+        "options": {}
+      },
+      "id": "hygiene-summary",
+      "name": "Resumen Post-Limpieza",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [700, 100],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO outreach_logs (lead_id, direction, channel, content, processing_status)\nSELECT\n  (SELECT id FROM outreach_leads ORDER BY created_at ASC LIMIT 1),\n  'system',\n  'internal',\n  json_build_object(\n    'type', 'hygiene_run',\n    'cold_count', {{ $node['Auto-COLD Inactivos'].json.cold_count || 0 }},\n    'discard_count', {{ $node['Descartar Phones Inválidos'].json.discard_count || 0 }},\n    'dedup_count', {{ $node['De-duplicar por Phone'].json.dedup_count || 0 }},\n    'timestamp', now()\n  )::text,\n  'processed'\nRETURNING id;",
+        "options": {}
+      },
+      "id": "hygiene-log",
+      "name": "Log Ejecucion",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [920, 100],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    }
+  ],
+  "connections": {
+    "Cron 06:00 UTC": {
+      "main": [
+        [{ "node": "Leer Config", "type": "main", "index": 0 }]
+      ]
+    },
+    "Leer Config": {
+      "main": [
+        [
+          { "node": "Auto-COLD Inactivos", "type": "main", "index": 0 },
+          { "node": "Descartar Phones Inválidos", "type": "main", "index": 0 },
+          { "node": "De-duplicar por Phone", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Auto-COLD Inactivos": {
+      "main": [
+        [{ "node": "Resumen Post-Limpieza", "type": "main", "index": 0 }]
+      ]
+    },
+    "Descartar Phones Inválidos": {
+      "main": [
+        [{ "node": "Resumen Post-Limpieza", "type": "main", "index": 0 }]
+      ]
+    },
+    "De-duplicar por Phone": {
+      "main": [
+        [{ "node": "Resumen Post-Limpieza", "type": "main", "index": 0 }]
+      ]
+    },
+    "Resumen Post-Limpieza": {
+      "main": [
+        [{ "node": "Log Ejecucion", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Cron diario 06:00 UTC. Auto-COLD leads inactivos (>14d + max follow-ups agotados), descarta phones inválidos y de-duplica. Registra resultados en outreach_logs.",
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    { "name": "outreach" },
+    { "name": "hygiene" },
+    { "name": "v2" }
+  ]
+}

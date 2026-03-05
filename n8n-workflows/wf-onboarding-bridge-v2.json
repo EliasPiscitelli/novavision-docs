@@ -1,0 +1,135 @@
+{
+  "name": "WF-ONBOARDING-BRIDGE – Sync Onboarding ↔ Leads",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */2 * * *"
+            }
+          ]
+        }
+      },
+      "id": "bridge-trigger",
+      "name": "Cron cada 2h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT ol.id as lead_id, ol.email, ol.phone, ol.status as lead_status,\n       no.id as onboarding_id, no.status as onb_status, no.slug, no.builder_token,\n       na.id as account_id, na.slug as account_slug, na.status as account_status\nFROM outreach_leads ol\nLEFT JOIN nv_onboarding no ON lower(trim(no.email)) = lower(trim(ol.email))\nLEFT JOIN nv_accounts na ON na.email = ol.email\nWHERE ol.status IN ('NEW', 'CONTACTED', 'IN_CONVERSATION', 'QUALIFIED', 'ONBOARDING')\n  AND (no.id IS NOT NULL OR na.id IS NOT NULL)\n  AND (ol.onboarding_id IS DISTINCT FROM no.id\n       OR ol.account_id IS DISTINCT FROM na.id\n       OR ol.onboarding_status IS DISTINCT FROM COALESCE(no.status::text, na.status))\nLIMIT 200;",
+        "options": {}
+      },
+      "id": "bridge-find-matches",
+      "name": "Buscar Matches Lead↔Onboarding",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [220, 0],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.lead_id }}",
+              "value2": "",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "bridge-has-matches",
+      "name": "Hay matches?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE outreach_leads SET\n  onboarding_id = '{{ $json.onboarding_id }}'::uuid,\n  account_id = CASE WHEN '{{ $json.account_id }}' != '' THEN '{{ $json.account_id }}'::uuid ELSE account_id END,\n  store_slug = COALESCE('{{ $json.slug }}', '{{ $json.account_slug }}', store_slug),\n  onboarding_status = COALESCE('{{ $json.onb_status }}', '{{ $json.account_status }}', onboarding_status),\n  builder_url = CASE \n    WHEN '{{ $json.builder_token }}' != '' \n    THEN 'https://novavision.com.ar/builder?token=' || '{{ $json.builder_token }}'\n    ELSE builder_url \n  END,\n  status = CASE\n    WHEN '{{ $json.account_status }}' = 'active' THEN 'WON'\n    WHEN '{{ $json.onb_status }}' IN ('in_progress', 'submitted', 'review') THEN 'ONBOARDING'\n    WHEN status = 'NEW' OR status = 'CONTACTED' THEN 'QUALIFIED'\n    ELSE status\n  END,\n  won_at = CASE WHEN '{{ $json.account_status }}' = 'active' AND won_at IS NULL THEN now() ELSE won_at END,\n  qualified_at = CASE WHEN qualified_at IS NULL AND '{{ $json.onboarding_id }}' != '' THEN now() ELSE qualified_at END,\n  updated_at = now()\nWHERE id = '{{ $json.lead_id }}'::uuid;",
+        "options": {}
+      },
+      "id": "bridge-update-lead",
+      "name": "Actualizar Lead con Onboarding",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [700, -100],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO outreach_logs (lead_id, direction, channel, content, processing_status)\nVALUES (\n  '{{ $json.lead_id }}'::uuid,\n  'system',\n  'internal',\n  'Bridge sync: onboarding_status={{ $json.onb_status || $json.account_status }}, account={{ $json.account_id }}, slug={{ $json.slug || $json.account_slug }}',\n  'processed'\n);",
+        "options": {}
+      },
+      "id": "bridge-log",
+      "name": "Log Sync",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [920, -100],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  'bridge_run' as type,\n  (SELECT count(*) FROM outreach_leads WHERE onboarding_id IS NOT NULL) as leads_linked,\n  (SELECT count(*) FROM outreach_leads WHERE status = 'ONBOARDING') as leads_onboarding,\n  (SELECT count(*) FROM outreach_leads WHERE status = 'WON') as leads_won,\n  now() as run_at;",
+        "options": {}
+      },
+      "id": "bridge-summary",
+      "name": "Resumen",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [700, 200],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    }
+  ],
+  "connections": {
+    "Cron cada 2h": {
+      "main": [
+        [{ "node": "Buscar Matches Lead↔Onboarding", "type": "main", "index": 0 }]
+      ]
+    },
+    "Buscar Matches Lead↔Onboarding": {
+      "main": [
+        [{ "node": "Hay matches?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Hay matches?": {
+      "main": [
+        [{ "node": "Actualizar Lead con Onboarding", "type": "main", "index": 0 }],
+        [{ "node": "Resumen", "type": "main", "index": 0 }]
+      ]
+    },
+    "Actualizar Lead con Onboarding": {
+      "main": [
+        [{ "node": "Log Sync", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Cron cada 2h. Cruza email de outreach_leads con nv_onboarding y nv_accounts. Sincroniza estados: si empezó onboarding → ONBOARDING, si tiene account activa → WON. Registra timestamps en qualified_at/won_at.",
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    { "name": "outreach" },
+    { "name": "bridge" },
+    { "name": "v2" }
+  ]
+}
