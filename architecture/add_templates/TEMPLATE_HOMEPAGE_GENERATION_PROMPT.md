@@ -892,22 +892,25 @@ Ya existen 8 templates en el sistema. Tu diseño **DEBE ser visualmente diferent
 
 ---
 
-## 14. REGISTRO POST-GENERACIÓN — ARCHIVOS QUE DEBÉS CONFIGURAR (para el desarrollador)
+## 14. REGISTRO POST-GENERACION — ARCHIVOS QUE DEBES CONFIGURAR (para el desarrollador)
 
-> **Esta sección es para el DESARROLLADOR que integra el template generado al repo.** NO es parte del prompt de IA, sino un recordatorio de TODO lo que hay que tocar para que el template funcione en producción.
+> **Esta seccion es para el DESARROLLADOR que integra el template generado al repo.** No es parte del prompt creativo, sino un recordatorio de todo lo que hay que tocar para que el template funcione en preview y en produccion.
 
-Después de generar y colocar el template en `src/templates/{nombre}/`, hay que registrarlo en **6 archivos obligatorios**:
+Despues de generar y colocar el template en `src/templates/{nombre}/`, hay que registrarlo al menos en estos puntos:
 
 ### 14.1 `src/registry/templatesMap.ts`
 ```typescript
-import HomeTemplate8 from '../templates/eighth/pages/HomePageLumina';
+import { lazy } from 'react';
+
+const HomeTemplate8 = lazy(() => import('../templates/eighth/pages/HomePageLumina'));
 
 export const TEMPLATES = {
   // ...existing...
-  template_8: HomeTemplate8,  // ← canonical key (DB)
-  eighth: HomeTemplate8,      // ← folder key (legacy)
+  template_8: HomeTemplate8,
 };
 ```
+
+Nota: el flujo publicado hoy consume principalmente claves canonicas `template_N` desde `HomeRouter`.
 
 ### 14.2 `src/templates/manifest.js`
 ```javascript
@@ -931,27 +934,57 @@ eighth: 'eighth',
 ```
 
 ### 14.4 `src/components/DynamicHeader.jsx`
-En `TEMPLATE_HEADER_MAP`, agregar:
+Si el template necesita header propio, agregarlo en `TEMPLATE_HEADER_MAP`:
 ```javascript
 template_8: HeaderFifth, // TODO: crear HeaderEighth propio
 eighth: HeaderFifth,
 ```
 Y en `normalizeTemplateKey`, agregar `"template_8"` y `"eighth"` al array `valid`.
 
-### 14.5 `src/__dev/pages/TemplatePreviewer.jsx`
+### 14.5 `src/registry/sectionComponents.tsx`
+Si el template va a soportar secciones dinamicas nuevas, registrar sus `componentKey` runtime:
+
+```tsx
+const eighthTemplateLoader = () => import('./sectionComponentTemplates/eighth');
+const HeroEighth = lazyTemplateExport(eighthTemplateLoader, 'HeroEighth');
+
+export const SECTION_COMPONENTS = {
+  ...,
+  'hero.eighth': HeroEighth,
+};
+```
+
+### 14.6 `src/registry/sectionComponentTemplates/*.tsx`
+Re-exportar los componentes reales del template:
+
+```tsx
+export { default as HeroEighth } from '../../templates/eighth/components/Hero';
+export { default as FooterEighth } from '../../templates/eighth/components/Footer';
+```
+
+### 14.7 `src/__dev/pages/TemplatePreviewer.jsx`
 En `CANONICAL_TO_ALIAS`, agregar:
 ```javascript
 template_8: 'eighth',
 ```
 
-### 14.6 (Opcional) `src/theme/palettes.ts`
+### 14.8 (Opcional) `src/theme/palettes.ts`
 Si el template necesita paletas propias:
 ```typescript
 export const eighth_glow: PaletteTokens = { ... };
 ```
 Y agregar en `PALETTES` y en el manifest como `recommendedPalettes`.
 
-### 14.7 (Opcional) Base de datos
+### 14.9 Preview del builder
+Recorda que el builder no usa `GET /home/data` para previsualizar. El flujo actual es:
+
+```text
+Step4TemplateSelector -> PreviewFrame -> /preview -> PreviewHost -> SectionRenderer
+```
+
+Si el template o una seccion solo funciona en store publicada pero no en preview, revisar `PreviewHost` y los props inyectados por `SectionRenderer`.
+
+### 14.10 (Opcional) Base de datos
 Verificar si hay un enum o constraint en la tabla de accounts que limite `template_id`. Si existe, agregar `template_8`.
 
 ---

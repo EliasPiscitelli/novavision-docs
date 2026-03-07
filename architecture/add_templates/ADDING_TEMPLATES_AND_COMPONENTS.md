@@ -1,123 +1,234 @@
-# 📚 Guía: Cómo Agregar un Nuevo Template y Componentes en NovaVision
+# Guia: Como Agregar un Nuevo Template y Componentes en NovaVision
 
-> **Última actualización:** 2026-02-21  
-> **Basado en código real** (validado contra codebase, no docs anteriores)  
-> **Autor:** Revisión completa vs código actual  
-> **Versión:** 2.0 — Incluye TODOS los archivos de configuración necesarios (8 pasos)
+> **Ultima actualizacion:** 2026-03-06  
+> **Basado en codigo real** (validado contra `apps/admin`, `apps/api` y `apps/web`)  
+> **Autor:** Revision y actualizacion de arquitectura lazy + preview  
+> **Version:** 3.0
 
 ---
 
-## ⚠️ Estado de la documentación previa
+## Estado de la documentacion previa
 
-| Documento                             | Estado                   | Problema                                                                                                                                                            |
-| ------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `store_render_flow.md`                | ⚠️ Parcialmente obsoleto | Dice que HomeRouter tiene su propio ThemeProvider — **ya no existe** desde `NOVAVISION-THEME-FIX-2026-02-07`. El tema ahora se resuelve completamente en `App.jsx`. |
-| `TAILWIND_TEMPLATE_COMPATIBILITY.md`  | ✅ Vigente               | El contrato de 28 variables CSS `--nv-*` sigue siendo correcto.                                                                                                     |
-| `TEMPLATE_GENERATION_PROMPT_GUIDE.md` | ✅ Vigente               | Las reglas de CSS vars y prompts de IA son correctas.                                                                                                               |
+| Documento | Estado | Nota |
+| --- | --- | --- |
+| `store_render_flow.md` | Parcialmente obsoleto | Sigue mencionando un `ThemeProvider` en `HomeRouter` que ya no existe. |
+| `ADDING_TEMPLATES_AND_COMPONENTS.md` | Obsoleto | Describia `templatesMap.ts` sin lazy loading y no contemplaba `sectionComponentTemplates/*`. |
+| `TEMPLATE_HOMEPAGE_GENERATION_PROMPT.md` | Parcial | La parte creativa sigue sirviendo, pero el registro tecnico post-generacion quedo viejo. |
 
 ---
 
 ## 1. Arquitectura actual del sistema de templates
 
-```
+```text
 App.jsx
-├── useEffectiveTheme()              ← Resuelve el tema (templateKey + paletteKey)
-├── useThemeVars(theme)              ← Aplica CSS vars al :root
-├── paletteVars override (useEffect) ← API vars sobreescriben todo (fuente de verdad)
-├── ThemeProvider (styled-components)
-│   ├── GlobalStyle
-│   ├── AnnouncementBar
-│   ├── DynamicHeader  ←──────────── GLOBAL, fuera del template
-│   └── AppRoutes
-│       └── HomeRouter
-│           └── SelectedHome   ←─── template elegido (NO tiene su propio ThemeProvider)
+|- useFetchHomeDataWithOptions()
+|- useEffectiveTheme()
+|- useThemeVars(theme)
+|- ThemeProvider (styled-components)
+|  |- GlobalStyle
+|  |- AnnouncementBar
+|  |- DynamicHeader        <- global, fuera del template
+|  \- AppRoutes
+|     \- HomeRouter
+|        \- Suspense
+|           \- TEMPLATES[templateKey]
 ```
 
-> [!IMPORTANT]
-> **No hay un segundo ThemeProvider en HomeRouter** (fue eliminado en Feb 2026 por flickering). El theme se inyecta UNA SOLA VEZ en `App.jsx` vía `useThemeVars` + el override de `paletteVars` desde la API.
+Puntos clave:
+
+- No hay un segundo `ThemeProvider` en `HomeRouter`.
+- El template publicado se elige con `homeData.config.templateKey`.
+- `templatesMap.ts` ahora usa `lazy(() => import(...))` para cada Home.
+- El render dinamico de secciones pasa por `SectionRenderer` -> `sectionComponents.tsx` -> `sectionComponentTemplates/*`.
 
 ---
 
-## 2. Flujo de datos: de la API al template
+## 2. Flujo real: onboarding -> preview -> publicacion -> render
 
+### 2.1 Onboarding / builder
+
+```text
+Step4TemplateSelector.tsx
+|- getTemplates()        -> GET /templates
+|- getPalettes()         -> GET /onboarding/palettes
+|- updatePreferences()   -> PATCH /onboarding/preferences
+|- PreviewFrame          -> /preview + postMessage(payload)
 ```
+
+El builder trabaja con estas piezas:
+
+- `apps/admin/src/pages/BuilderWizard/steps/Step4TemplateSelector.tsx`
+- `apps/admin/src/services/builder/api.ts`
+- `apps/admin/src/services/builder/designSystem.ts`
+
+El payload que maneja el builder incluye:
+
+- `templateKey`
+- `paletteKey`
+- `paletteVars`
+- `themeOverride`
+- `designConfig.sections[]`
+- `seed` de preview
+
+### 2.2 Persistencia y sync en API
+
+```text
+PATCH /onboarding/preferences
+    -> OnboardingService.updatePreferences()
+    -> nv_onboarding.selected_template_key
+    -> nv_onboarding.selected_palette_key
+    -> nv_onboarding.selected_theme_override
+    -> sync a backend client_home_settings si el cliente ya esta provisionado
+```
+
+Archivos involucrados:
+
+- `apps/api/src/onboarding/onboarding.controller.ts`
+- `apps/api/src/onboarding/onboarding.service.ts`
+- `apps/api/src/home/home-settings.service.ts`
+- `apps/api/src/home/home.service.ts`
+
+### 2.3 Preview del builder
+
+```text
+Admin Builder
+    -> PreviewFrame
+    -> /preview
+    -> PreviewHost
+    -> SectionRenderer
+    -> sectionComponents.tsx
+```
+
+Importante:
+
+- El preview **no** usa `GET /home/data` para renderizar la estructura que el usuario esta armando.
+- `apps/web/src/pages/PreviewHost/index.tsx` recibe todo por `postMessage`.
+- El preview usa seed demo o seed del builder para productos, banners, FAQ y contacto.
+
+### 2.4 Tienda publicada
+
+```text
+App.jsx
+    -> GET /home/data
+    -> normalizeHomeData()
+    -> HomeRouter
+    -> TEMPLATES[config.templateKey]
+    -> Home del template
+       -> sections.map(SectionRenderer) o layout estatico
+```
+
+La tienda publicada si depende de:
+
+- `apps/api/src/home/home.controller.ts`
+- `apps/api/src/home/home.service.ts`
+- `apps/api/src/home/home-settings.service.ts`
+
+Y el fallback real server-side hoy es:
+
+1. `client_home_settings.template_key`
+2. `clients.template_id`
+3. `template_1`
+
+---
+
+## 3. Contrato de datos para el template publicado
+
+```text
 GET /home/data
-    └── normalizeHomeData()
-            └── homeData {
-                  products[], services[], banners{},
-                  faqs[], logo, contactInfo[], socialLinks,
-                  config: {
-                    templateKey: "template_1",   ← elige qué template renderizar
-                    paletteKey: "starter_default",
-                    paletteVars: { --nv-primary: "#2563EB", ... },  ← 27 CSS vars
-                    sections: [],               ← si hay secciones → modo dinámico
-                    identity_config: { banners: { popup, top } }
-                  }
-                }
-            └── HomeRouter recibe homeData
-                    └── TEMPLATES[templateKey] → componente Home del template
+    -> response.data
+       -> products
+       -> services
+       -> banners
+       -> faqs
+       -> logo
+       -> contactInfo
+       -> socialLinks
+       -> storeName
+       -> merchantLegal
+       -> config
+          -> templateKey
+          -> paletteKey
+          -> paletteVars
+          -> identity_config
+          -> themeConfig
+          -> sections
+```
+
+Para el Home del template, lo mas importante es:
+
+- `homeData.config.templateKey`
+- `homeData.config.sections`
+- `homeData.config.paletteVars`
+- `homeData.products`
+- `homeData.services`
+- `homeData.faqs`
+- `homeData.contactInfo`
+- `homeData.banners`
+- `homeData.logo`
+
+---
+
+## 4. Estructura actual de archivos
+
+```text
+apps/web/src/templates/
+|- first/
+|- second/
+|- third/
+|- fourth/
+|- fifth/
+|- sixth/
+|- seventh/
+\- eighth/
+
+apps/web/src/registry/
+|- templatesMap.ts
+|- sectionComponents.tsx
+\- sectionComponentTemplates/
+   |- first.tsx
+   |- second.tsx
+   |- third.tsx
+   |- fourth.tsx
+   |- fifth.tsx
+   |- sixth.tsx
+   |- seventh.tsx
+   \- eighth.tsx
 ```
 
 ---
 
-## 3. Sistema de Templates: estructura de archivos
+## 5. Como agregar un nuevo template Home
 
-```
-src/templates/
-├── manifest.js               ← Catálogo de templates (metadatos, features, status)
-├── first/
-│   ├── components/           ← Componentes PRIVADOS del template
-│   │   ├── Header/           ← ⚠️ NO se usa (Header global en App.jsx)
-│   │   ├── Footer/
-│   │   ├── ProductCard/
-│   │   ├── ProductCarousel/
-│   │   ├── Services/
-│   │   ├── CollectionsSection/
-│   │   ├── ContactSection/
-│   │   ├── FAQSection/
-│   │   └── ToTopButton/
-│   └── pages/
-│       └── HomePageFirst/
-│           └── index.jsx     ← Entry point del template
-├── second/   (estructura similar)
-├── third/    (estructura similar)
-├── fourth/   (estructura similar)
-└── fifth/    (estructura similar)
-
-src/registry/
-└── templatesMap.ts           ← Mapeo ID → componente (importado por HomeRouter)
-```
-
----
-
-## 4. Cómo agregar un nuevo template (paso a paso)
-
-### Paso 1: Crear la carpeta del template
+### Paso 1: crear la carpeta del template
 
 ```bash
-mkdir -p apps/web/src/templates/sixth/pages/HomePageSixth
-mkdir -p apps/web/src/templates/sixth/components
+mkdir -p apps/web/src/templates/ninth/pages/HomePageNinth
+mkdir -p apps/web/src/templates/ninth/components
 ```
 
-### Paso 2: Crear el componente Home del template
+### Paso 2: crear el componente Home
 
-`apps/web/src/templates/sixth/pages/HomePageSixth/index.jsx`:
+Ejemplo base:
 
 ```jsx
-import { SectionRenderer } from "../../../../components/SectionRenderer";
-import { DEMO_HOME_DATA } from "../../../../sections/demoData";
-// ✅ NO importar Header — se renderiza en App.jsx globalmente
-// ✅ NO crear ThemeProvider aquí — el tema ya está inyectado en :root
+import { SectionRenderer } from '../../../../components/SectionRenderer';
+import { DEMO_HOME_DATA } from '../../../../sections/demoData';
 
-function HomePageSixth({ homeData: rawHomeData }) {
-  // Siempre usar DEMO_HOME_DATA como fallback
+function HomePageNinth({ homeData: rawHomeData }) {
   const homeData = rawHomeData || DEMO_HOME_DATA;
 
-  const { products, services, faqs, contactInfo, logo, banners } = homeData;
+  const {
+    products,
+    services,
+    faqs,
+    contactInfo,
+    logo,
+    banners,
+    socialLinks,
+  } = homeData;
 
   const sections = homeData?.config?.sections || [];
 
-  // MODO DINÁMICO: si hay secciones configuradas en Admin
   if (sections.length > 0) {
     return (
       <>
@@ -125,199 +236,195 @@ function HomePageSixth({ homeData: rawHomeData }) {
           <SectionRenderer
             key={section.id}
             section={section}
-            data={{ products, services, faqs, contactInfo }}
+            data={{
+              products,
+              services,
+              faqs,
+              contactInfo,
+              logo,
+              banners,
+              socialLinks,
+            }}
           />
         ))}
       </>
     );
   }
 
-  // MODO ESTÁTICO: layout fijo del template
   return (
     <>
-      {/* Tus secciones hardcodeadas aquí */}
-      {/* Usar SOLO variables --nv-* para colores — ver sección 7 */}
+      {/* Layout estatico del template */}
     </>
   );
 }
 
-export default HomePageSixth;
+export default HomePageNinth;
 ```
 
-### Paso 3: Registrar en `templatesMap.ts`
+Reglas:
 
-`apps/web/src/registry/templatesMap.ts`:
+- No importar el header publico aca.
+- No crear un `ThemeProvider` propio.
+- Soportar ambos modos: dinamico y estatico.
 
-```typescript
-import HomeTemplate1 from "../templates/first/pages/HomePageFirst";
-import HomeTemplate2 from "../templates/second/pages/HomePage";
-import HomeTemplate3 from "../templates/third/pages/HomePageThird";
-import HomeTemplate4 from "../templates/fourth/pages/Home";
-import HomeTemplate5 from "../templates/fifth/pages/Home";
-import HomeTemplate6 from "../templates/sixth/pages/HomePageSixth"; // ← AGREGAR
+### Paso 3: registrar en `templatesMap.ts` con lazy loading
+
+Ejemplo:
+
+```ts
+import { lazy } from 'react';
+
+const HomeTemplate9 = lazy(() => import('../templates/ninth/pages/HomePageNinth'));
 
 export const TEMPLATES = {
-  // Canonical keys (matches DB)
-  template_1: HomeTemplate1,
-  template_2: HomeTemplate2,
-  template_3: HomeTemplate3,
-  template_4: HomeTemplate4,
-  template_5: HomeTemplate5,
-  template_6: HomeTemplate6, // ← AGREGAR
-
-  // Legacy/Folder keys
-  first: HomeTemplate1,
-  second: HomeTemplate2,
-  third: HomeTemplate3,
-  fourth: HomeTemplate4,
-  fifth: HomeTemplate5,
-  sixth: HomeTemplate6, // ← AGREGAR
+  ...,
+  template_9: HomeTemplate9,
 };
 ```
 
-> [!IMPORTANT]
-> Los **canonical keys** (`template_1`, `template_2`, etc.) son los que se guardan en la base de datos. Los **folder keys** (`first`, `second`, etc.) son aliases de retrocompatibilidad. Siempre agregar AMBOS.
+Importante:
 
-### Paso 4: Registrar en `manifest.js`
+- Hoy `HomeRouter.jsx` consume claves canonicas `template_1` ... `template_8`.
+- Si agregas un `template_9`, asegurate de mantener la convencion canonica desde API y theme.
 
-`apps/web/src/templates/manifest.js`:
+### Paso 4: registrar en la normalizacion de theme
 
-```javascript
-export const TEMPLATES = {
-  // ... templates existentes ...
+Actualizar `apps/web/src/theme/resolveEffectiveTheme.ts` para que el template nuevo no caiga en fallback incorrecto.
 
-  sixth: {
-    id: "sixth",
-    name: "Mi Nuevo Template",
-    description: "Descripción corta del estilo del template",
-    status: "beta", // 'stable' | 'beta' | 'deprecated'
-    preview: "/demo/templates/sixth-preview.png",
-    features: [
-      "banner-carousel",
-      "product-grid",
-      "dynamic-sections",
-      // otros features que soporta
-    ],
-    entryPage: "HomePageSixth",
-    supportsSections: true, // true si implementa SectionRenderer
-  },
+Ejemplo:
+
+```ts
+const templateMap = {
+  ...,
+  template_9: 'ninth',
+  ninth: 'ninth',
 };
 ```
 
-### Paso 5: Registrar en `resolveEffectiveTheme.ts` (**OBLIGATORIO**)
+### Paso 5: registrar header si el template necesita variante propia
 
-`apps/web/src/theme/resolveEffectiveTheme.ts` — en la función `normalizeTemplateKey`, agregar al `templateMap`:
+Si el template requiere header visual propio, actualizar `apps/web/src/components/DynamicHeader.jsx`.
 
-```typescript
-const templateMap: Record<string, string> = {
-  // ...existing...
-  template_8: 'eighth',   // ← AGREGAR canonical key
-  // ...existing aliases...
-  eighth: 'eighth',        // ← AGREGAR folder key
+Si no, podes dejarlo usando el fallback global existente.
+
+### Paso 6: registrar el template en tooling auxiliar
+
+Revisar, segun aplique:
+
+- `apps/web/src/templates/manifest.js`
+- `apps/web/src/__dev/pages/TemplatePreviewer.jsx`
+- assets preview en `apps/web/public/demo/templates/`
+
+---
+
+## 6. Como agregar componentes para secciones dinamicas
+
+Si el builder va a emitir `componentKey` nuevos, hay que registrar toda la cadena runtime.
+
+### Paso 1: exponer el componente en `sectionComponentTemplates/*`
+
+Ejemplo:
+
+```tsx
+// apps/web/src/registry/sectionComponentTemplates/ninth.tsx
+export { default as HeroNinth } from '../../templates/ninth/components/Hero';
+export { default as FooterNinth } from '../../templates/ninth/components/Footer';
+```
+
+### Paso 2: registrar loader y exports en `sectionComponents.tsx`
+
+Ejemplo:
+
+```tsx
+const ninthTemplateLoader = () => import('./sectionComponentTemplates/ninth');
+const HeroNinth = lazyTemplateExport(ninthTemplateLoader, 'HeroNinth');
+
+export const SECTION_COMPONENTS = {
+  ...,
+  'hero.ninth': HeroNinth,
 };
 ```
 
-> [!IMPORTANT]
-> Sin esto, el theme system NO reconoce el template y usa el fallback `'first'`. La paleta se aplica incorrectamente.
+### Paso 3: asegurar consistencia con el builder
 
-### Paso 6: Registrar en `DynamicHeader.jsx` (**OBLIGATORIO**)
+Los `componentKey` que el builder genera tienen que existir en:
 
-`apps/web/src/components/DynamicHeader.jsx` — dos cambios:
+- `apps/admin/src/services/builder/designSystem.ts`
+- o en el `SECTION_CATALOG` compartido que consume el admin
+- y en el runtime registry del web (`sectionComponents.tsx`)
 
-**a) En `TEMPLATE_HEADER_MAP`:**
-```javascript
-const TEMPLATE_HEADER_MAP = {
-  // ...existing...
-  template_8: HeaderFifth,  // ← AGREGAR (usar HeaderFifth como fallback hasta crear uno propio)
-  eighth: HeaderFifth,      // ← AGREGAR
-};
-```
+Si falta alguno de esos pasos, el preview o la tienda publicada van a renderizar `null` o caer en fallback.
 
-**b) En `normalizeTemplateKey`:**
-```javascript
-const valid = [
-  "template_1", "template_2", ..., "template_8",  // ← AGREGAR
-  "first", "second", ..., "eighth",                // ← AGREGAR
-];
-```
+---
 
-> [!IMPORTANT]
-> Sin esto, el header NO se renderiza para el template nuevo. Se usa el fallback (Fifth) pero el templateKey no se reconoce como válido.
+## 7. Diferencia entre preview y tienda publicada
 
-### Paso 7: Registrar en `TemplatePreviewer.jsx` (**OBLIGATORIO para dev portal**)
+| Flujo | Fuente de datos | Selector de template | Render de secciones |
+| --- | --- | --- | --- |
+| Preview builder | `postMessage(payload)` | `payload.templateKey` | `PreviewHost -> SectionRenderer` |
+| Store publicada | `GET /home/data` | `homeData.config.templateKey` | `Home template -> SectionRenderer` |
 
-`apps/web/src/__dev/pages/TemplatePreviewer.jsx` — en `CANONICAL_TO_ALIAS`:
+Esto es clave para debug:
 
-```javascript
-const CANONICAL_TO_ALIAS = {
-  // ...existing...
-  template_8: 'eighth',  // ← AGREGAR
-};
-```
+- Si falla el preview, mirar `Step4TemplateSelector`, `PreviewFrame` y `PreviewHost`.
+- Si falla la tienda publicada, mirar `GET /home/data`, `HomeSettingsService`, `HomeRouter` y el Home del template.
 
-> Sin esto, el Dev Portal no muestra el template en el selector, ni resuelve la paleta por defecto.
+---
 
-### Paso 8: (Opcional) Paleta personalizada en `palettes.ts`
+## 8. Checklist de integracion
 
-Si el template necesita colores propios, crear una paleta en `apps/web/src/theme/palettes.ts`:
+Antes de considerar terminado un template nuevo, verificar:
 
-```typescript
-export const eighth_glow: PaletteTokens = {
-  bg: '#FAFBFF',
-  surface: '#FFFFFF',
-  navbar_bg: '#FFFFFF',
-  footer_bg: '#0F172A',
-  text: '#1E293B',
-  text_muted: '#64748B',
-  primary: '#6366F1',
-  primary_hover: '#4F46E5',
-  primary_fg: '#FFFFFF',
-  accent: '#F59E0B',
-  accent_fg: '#FFFFFF',
-  border: '#E2E8F0',
-  // ...etc
-};
-```
+| # | Archivo / area | Que revisar |
+| --- | --- | --- |
+| 1 | `apps/web/src/templates/{nombre}/pages/` | Entry point creado |
+| 2 | `apps/web/src/registry/templatesMap.ts` | Registro lazy con clave canonica |
+| 3 | `apps/web/src/theme/resolveEffectiveTheme.ts` | Normalizacion del template |
+| 4 | `apps/web/src/components/DynamicHeader.jsx` | Header propio o fallback correcto |
+| 5 | `apps/web/src/registry/sectionComponents.tsx` | Nuevos `componentKey` registrados |
+| 6 | `apps/web/src/registry/sectionComponentTemplates/*` | Re-exports del template |
+| 7 | `apps/admin/src/services/builder/designSystem.ts` | Presets / catalogo consistentes |
+| 8 | `apps/api/src/home/home-settings.service.ts` | Clave canonica valida y fallback correcto |
+| 9 | Preview builder | Renderiza via `/preview` |
+| 10 | Store publicada | Renderiza via `/home/data` |
 
-Y registrarla en `PALETTES`:
-```typescript
-export const PALETTES = {
-  // ...existing...
-  eighth_glow,
-};
-```
+---
 
-Luego en `manifest.js` agregar:
-```javascript
-recommendedPalettes: ['eighth_glow'],
-```
+## 9. Errores comunes
 
-### Paso 9: (Opcional) Base de datos
+### El preview funciona pero la tienda publicada no
 
-Verificar si hay un enum o constraint en la tabla `accounts` que limite `template_id`. Si existe:
-```sql
-ALTER TYPE template_id_enum ADD VALUE 'template_8';
-```
+Posibles causas:
 
-### Paso 10: Datos demo y preview image
+- `templateKey` no llega a `client_home_settings`
+- falta normalizacion en `resolveEffectiveTheme.ts`
+- `HomeRouter` no encuentra la clave canonica
 
-- **Demo data:** verificar que `DEMO_HOME_DATA` en `src/sections/demoData.ts` tenga suficientes datos para todas las secciones del template.
-- **Preview:** agregar `apps/web/public/demo/templates/eighth-preview.png` para el selector en Admin.
+### La tienda publicada funciona pero una seccion dinamica no aparece
 
-### ⚠️ Checklist de registro completo
+Posibles causas:
 
-Antes de hacer PR con un template nuevo, verificar que está registrado en **TODOS** estos archivos:
+- falta el `componentKey` en `sectionComponents.tsx`
+- falta el re-export en `sectionComponentTemplates/*`
+- el builder esta emitiendo una key distinta a la que el web soporta
 
-| # | Archivo | Cambio | ¿Obligatorio? |
-|---|---------|--------|:-:|
-| 1 | `src/templates/{nombre}/pages/` | Crear carpeta + entry point | ✅ |
-| 2 | `src/registry/templatesMap.ts` | Import + canonical key + folder key | ✅ |
-| 3 | `src/templates/manifest.js` | Config completa (id, name, status, features, entryPage) | ✅ |
-| 4 | `src/theme/resolveEffectiveTheme.ts` | `template_N` + `{nombre}` en `templateMap` | ✅ |
-| 5 | `src/components/DynamicHeader.jsx` | TEMPLATE_HEADER_MAP + normalizeTemplateKey | ✅ |
-| 6 | `src/__dev/pages/TemplatePreviewer.jsx` | CANONICAL_TO_ALIAS | ✅ |
-| 7 | `src/theme/palettes.ts` | Paleta personalizada (si aplica) | Opcional |
-| 8 | Base de datos | Enum constraint (si existe) | Condicional |
+### El template carga pero con estilo equivocado
+
+Posibles causas:
+
+- falta mapear el template en `resolveEffectiveTheme.ts`
+- `paletteVars` o `paletteKey` estan cayendo en fallback
+
+---
+
+## 10. Resumen operativo rapido
+
+- Preview del builder: `Step4TemplateSelector` -> `PreviewFrame` -> `PreviewHost` -> `SectionRenderer`
+- Store publicada: `App.jsx` -> `GET /home/data` -> `HomeRouter` -> template Home -> `SectionRenderer`
+- Fuente de verdad del template publicado: `client_home_settings`
+- Fallback server-side: `clients.template_id` -> `template_1`
+- Fuente de verdad de estructura en preview: `designConfig.sections[]`
+- Fuente de verdad de estructura publicada: `homeData.config.sections`
 | 9 | `public/demo/templates/` | Preview image | Recomendado |
 
 ---
