@@ -1089,7 +1089,6 @@ const PUBLIC_PATH_PREFIXES = [
   '/mp/oauth/callback',
   '/onboarding/',
   '/coupons/',
-  '/seo-ai/webhook',
 ];
 ```
 
@@ -1368,10 +1367,12 @@ Todas las rutas bajo `/onboarding/` bypasean AuthMiddleware. Si algún endpoint 
 
 ---
 
-**B9.3 — `/seo-ai/webhook` abierto sin validación de firma**
+**B9.3 — webhook legacy SEO AI abierto sin validación de firma**
+
+Estado actual: resuelto por eliminación del endpoint legacy; el webhook vigente para este flujo es `/addons/webhook`.
 
 ```typescript
-'/seo-ai/webhook',
+// endpoint legacy removido
 ```
 
 A diferencia de los webhooks de Mercado Pago (que validan firma), este webhook no tiene indicación de validación de origen/firma.
@@ -1585,7 +1586,7 @@ Basta con enviar **cualquier string** en `x-builder-token` — no se valida el J
 
 2. **B9.1 — `/coupons/` sin auth en middleware:** Verificar que todos los endpoints del controller tengan guard. Considerar mover a guard global del módulo.
 3. **B9.2 — `/onboarding/` público:** Verificar que todos los endpoints tengan BuilderSessionGuard.
-4. **B9.3 — `/seo-ai/webhook` sin firma:** Implementar HMAC o shared secret.
+4. **B9.3 — Endpoint legacy SEO AI eliminado:** cerrar el hallazgo en el seguimiento y mantener la validación de firma sobre `/addons/webhook`.
 5. **B9.4 — Fallback silencioso de tenant:** Cambiar a 403 en lugar de fallback al primer tenant.
 6. **B9.6 — MaintenanceGuard fail-open:** Cambiar a fail-closed (503).
 
@@ -2292,7 +2293,7 @@ Basta con enviar **cualquier string** en `x-builder-token` — no se valida el J
 ### Observaciones de seguridad identificadas
 
 1. **`/mercadopago` controller** — la mayoría de endpoints NO tienen guards explícitos (ni CC ni RG). Dependen del middleware global, pero debería verificarse.
-2. **Webhook endpoints sin firma** — `/seo-ai/webhook`, `/shipping/webhooks/:provider`, `/subscriptions/webhook`, `/onboarding/checkout/webhook` — deben validar HMAC/firma.
+2. **Webhook endpoints sin firma** — `/shipping/webhooks/:provider`, `/subscriptions/webhook`, `/onboarding/checkout/webhook` — deben validar HMAC/firma. El legado `/seo-ai/webhook` ya fue eliminado.
 3. **`/demo/seed`** usa solo `BuilderSessionGuard` — potencialmente peligroso si un builder puede inyectar datos.
 4. **`/mercadopago/debug/email`** — endpoint de debug expuesto sin guards visibles.
 5. **Duplicación de rutas** — `/seo-ai` base path compartido entre `seo-ai.controller.ts` y `seo-ai-purchase.controller.ts`.

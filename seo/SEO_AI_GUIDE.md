@@ -142,8 +142,8 @@ Los créditos se compran como add-ons vía Mercado Pago.
 |--------|------|------|-------------|
 | `GET` | `/seo-ai/packs` | ClientDashboard | Catálogo de packs |
 | `GET` | `/seo-ai/my-credits` | ClientDashboard | Balance + historial |
-| `POST` | `/seo-ai/purchase` | ClientDashboard | Comprar pack (→ MP) |
-| `POST` | `/seo-ai/purchase/webhook` | Público | Webhook de MP |
+| `POST` | `/addons/purchase` | ClientDashboard | Comprar pack SEO AI desde Addon Store |
+| `POST` | `/addons/webhook` | Público | Webhook consolidado de MP |
 
 ---
 
@@ -237,9 +237,9 @@ El `SeoAiWorkerService` usa `@Interval(10000)` (polling cada 10s):
 
 ```
 1. Cliente → GET /seo-ai/packs → ve catálogo
-2. Cliente → POST /seo-ai/purchase {addon_key} → crea preferencia MP
+2. Cliente → POST /addons/purchase {addon_key} → crea preferencia MP
 3. MP → redirect a checkout
-4. MP → POST /seo-ai/purchase/webhook → verifica firma HMAC
+4. MP → POST /addons/webhook → verifica firma HMAC
 5. API → addCredits(account, +delta, reason)
 6. Cliente → ve créditos actualizados
 ```

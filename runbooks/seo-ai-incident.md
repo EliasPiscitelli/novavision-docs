@@ -133,7 +133,7 @@ LIMIT 1;
 
 **Si no llegó el webhook:**
 1. Verificar URL del webhook en MP dashboard
-2. Verificar logs: `grep "seo-ai/purchase/webhook"` en Railway logs
+2. Verificar logs: `grep "addons/webhook"` en Railway logs
 3. **Acreditar manualmente:**
    ```sql
    INSERT INTO seo_ai_credits (account_id, delta, balance_after, reason, metadata)

@@ -529,10 +529,10 @@ El job acumula `tokens_input`, `tokens_output`, `cost_actual`.
 
 ```
 Store Admin → "Comprar Pack 500" → 
-  Backend crea MP preference (amount=14900, item="AI SEO Pack 500") →
+  Backend crea MP preference vía Addon Store (amount=14900, item="AI SEO Pack 500") →
   Redirect a MP →
   Usuario paga →
-  Webhook POST /seo-ai/webhook →
+  Webhook POST /addons/webhook →
     Verifica firma + idempotencia →
     Inserta account_addons →
     Inserta seo_ai_credits (delta=+550) →
@@ -611,12 +611,12 @@ Store Admin → "Generar SEO productos (45 seleccionados)" →
   - Vista de créditos por tenant
 - Tests: RLS, queries
 
-### PR4: Integración MP para packs AI + webhook + ledger
+### PR4: Integración MP para packs AI + Addon Store + ledger
 **Scope:** API + Web (Store Admin)  
 **Feature flag:** `seo.ai_autopilot` OFF por defecto
 
-- Endpoint `POST /seo-ai/purchase` → crea preferencia MP
-- Webhook `POST /seo-ai/webhook` → idempotente, acredita créditos
+- Endpoint `POST /addons/purchase` → crea preferencia MP
+- Webhook `POST /addons/webhook` → idempotente, acredita créditos
 - `SeoAiBillingService` → balance, debit, credit
 - UI Store Admin: tab "AI Autopilot" con selector de pack y botón "Comprar"
 - Vista de créditos y compras

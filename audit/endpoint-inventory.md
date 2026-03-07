@@ -1163,9 +1163,7 @@
 | HTTP | Ruta | Body DTO | Query DTO | Guards | Notas |
 |------|------|----------|-----------|--------|-------|
 | GET | `/seo-ai/packs` | — | — | @AllowNoTenant | Packs disponibles |
-| POST | `/seo-ai/purchase` | inline | — | ClientDashboardGuard, @AllowNoTenant | Comprar créditos |
 | GET | `/seo-ai/my-credits` | — | — | ClientDashboardGuard, @AllowNoTenant | Mis créditos |
-| POST | `/seo-ai/webhook` | raw body | — | @AllowNoTenant | **Webhook pago SEO AI** |
 
 ---
 

@@ -120,7 +120,7 @@ Hay un flujo paralelo para tokens `x-builder-token` (JWT propio firmado con `JWT
 Se listan `PUBLIC_PATH_PREFIXES` usando `url.startsWith()`:
 ```typescript
 '/mercadopago/webhook', '/health', '/auth/signup', '/auth/login',
-'/onboarding/', '/coupons/', '/seo-ai/webhook', ...
+'/onboarding/', '/coupons/', ...
 ```
 
 ⚠️ **P2 — OBSERVACIÓN: `/coupons/` es público en el middleware (comment dice "auth handled by BuilderOrSupabaseGuard at controller level")**, lo cual es correcto si el guard está aplicado consistentemente a todos los endpoints de ese controller.
