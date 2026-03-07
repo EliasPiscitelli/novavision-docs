@@ -17,6 +17,7 @@ Qué cambió:
 - Mayor peso visual y legibilidad en el título.
 - Bloque de precio más protagonista y más fácil de escanear.
 - Caja “Por qué te conviene” convertida en acordeón desplegable.
+- El grid ya no estira las cards vecinas cuando un acordeón se abre.
 - Animación de entrada por card con leve desplazamiento.
 - Hover con micro-movimiento y elevación visual.
 - CTA y campo de cupón alineados con el nuevo layout.
