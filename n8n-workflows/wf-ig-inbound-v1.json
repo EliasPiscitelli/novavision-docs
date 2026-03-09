@@ -1,0 +1,474 @@
+{
+  "name": "WF-IG-INBOUND-V1 — Instagram DM Inbound",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ig-inbound",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ig-webhook",
+      "name": "Webhook IG Inbound",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 260],
+      "webhookId": "ig-inbound-v1"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\":\"ok\"}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "ig-respond-ok",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [420, 260]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json || {};\nif (input.relay?.validated_by_api === true) {\n  return $input.all();\n}\nconst crypto = require('crypto');\nconst body = JSON.stringify(input.body || input);\nconst sig = input.headers?.['x-hub-signature-256'] || '';\nconst expected = 'sha256=' + crypto.createHmac('sha256', $env.META_APP_SECRET).update(body).digest('hex');\nif (sig !== expected) { throw new Error('Invalid webhook signature'); }\nreturn $input.all();"
+      },
+      "id": "ig-verify-sig",
+      "name": "Verify Meta Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 260]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst entry = body?.entry?.[0] || {};\nconst messaging = entry?.messaging?.[0] || null;\nif (!messaging || messaging?.message?.is_echo) {\n  return [{ json: { is_supported_event: false, is_status_update: true } }];\n}\nconst attachments = messaging.message?.attachments || [];\nconst firstAttachmentType = String(attachments[0]?.type || '').toLowerCase();\nconst typeMap = { image: 'IMAGE', audio: 'AUDIO', video: 'VIDEO', file: 'FILE', sticker: 'STICKER' };\nconst mappedType = attachments.length > 0 ? (typeMap[firstAttachmentType] || 'UNKNOWN') : 'TEXT';\nconst text = messaging.message?.text || messaging.postback?.title || messaging.quick_reply?.payload || '';\nreturn [{\n  json: {\n    is_supported_event: Boolean(messaging.message || messaging.postback),\n    is_status_update: false,\n    channel: 'INSTAGRAM',\n    provider: 'META',\n    provider_message_id: messaging.message?.mid || messaging.postback?.mid || null,\n    provider_parent_message_id: messaging.message?.reply_to?.mid || null,\n    external_user_id: messaging.sender?.id || null,\n    channel_account_id: messaging.recipient?.id || $env.META_IG_REPLY_ENDPOINT_ID || null,\n    external_display_name: messaging.sender?.name || '',\n    message_type: mappedType,\n    event_type: 'MESSAGE',\n    direction: 'INBOUND',\n    text_body: text,\n    normalized_text: (text || '').trim(),\n    media_url: attachments[0]?.payload?.url || null,\n    raw_payload: messaging,\n    received_at: new Date(messaging.timestamp || Date.now()).toISOString()\n  }\n}];"
+      },
+      "id": "ig-parse-event",
+      "name": "Parse Instagram Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 260]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "unsupported",
+              "leftValue": "={{ !$json.is_supported_event || $json.is_status_update }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "ig-filter-unsupported",
+      "name": "Filter Unsupported Events",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1080, 260]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT EXISTS(\n  SELECT 1\n  FROM public.message_events me\n  WHERE me.channel = 'INSTAGRAM'\n    AND me.provider = 'META'\n    AND me.provider_message_id = {{ JSON.stringify($node[\"Parse Instagram Event\"].json.provider_message_id) }}\n  LIMIT 1\n) AS is_duplicate"
+      },
+      "id": "ig-check-dedup",
+      "name": "Check IG Dedup",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1300, 260],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "is-dup",
+              "leftValue": "={{$json.is_duplicate}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "ig-is-dup",
+      "name": "Already Processed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1520, 260]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT *\nFROM public.resolve_conversation_entities(\n  'INSTAGRAM',\n  'META',\n  {{ JSON.stringify($node[\"Parse Instagram Event\"].json.external_user_id) }},\n  {{ JSON.stringify($node[\"Parse Instagram Event\"].json.channel_account_id) }},\n  {{ JSON.stringify($node[\"Parse Instagram Event\"].json.external_display_name || 'Instagram Lead') }},\n  NULL,\n  NULL\n)"
+      },
+      "id": "ig-resolve-entities",
+      "name": "Resolve Contact + Thread",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1740, 260],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH contact_update AS (\n  UPDATE public.contacts c\n     SET lifecycle_status = 'IN_CONVERSATION',\n         source = COALESCE(c.source, 'INBOUND_IG'),\n         conversation_stage = COALESCE(c.conversation_stage, 'INTRO'),\n         last_inbound_at = NOW(),\n         last_touch_at = NOW(),\n         bot_enabled = true,\n         next_followup_at = NULL,\n         updated_at = NOW()\n   WHERE c.id = {{ JSON.stringify($json.contact_id) }}::uuid\n   RETURNING c.id, c.ai_engagement_score\n), event_insert AS (\n  SELECT public.append_message_event(\n    {{ JSON.stringify($json.thread_id) }}::uuid,\n    {{ JSON.stringify($json.contact_id) }}::uuid,\n    'INSTAGRAM',\n    'META',\n    'INBOUND',\n    'LEAD',\n    'MESSAGE',\n    {{ JSON.stringify($node[\"Parse Instagram Event\"].json.message_type) }},\n    {{ JSON.stringify($node[\"Parse Instagram Event\"].json.provider_message_id) }},\n    {{ $node[\"Parse Instagram Event\"].json.provider_parent_message_id ? JSON.stringify($node[\"Parse Instagram Event\"].json.provider_parent_message_id) : 'NULL' }},\n    {{ JSON.stringify('ig:' + $node[\"Parse Instagram Event\"].json.provider_message_id) }},\n    {{ JSON.stringify($node[\"Parse Instagram Event\"].json.text_body || '') }},\n    {{ JSON.stringify($node[\"Parse Instagram Event\"].json.normalized_text || '') }},\n    {{ $node[\"Parse Instagram Event\"].json.media_url ? JSON.stringify($node[\"Parse Instagram Event\"].json.media_url) : 'NULL' }},\n    NULL,\n    NULL,\n    NULL,\n    'RECEIVED',\n    'PROCESSED',\n    NULL,\n    NULL,\n    {{ JSON.stringify(JSON.stringify($node[\"Parse Instagram Event\"].json.raw_payload || {})) }}::jsonb,\n    NULL,\n    {{ JSON.stringify($node[\"Parse Instagram Event\"].json.received_at) }}::timestamptz\n  ) AS event_id\n), lead_sync AS (\n  SELECT public.sync_contact_to_outreach_lead({{ JSON.stringify($json.contact_id) }}::uuid, {{ JSON.stringify($json.contact_channel_identity_id) }}::uuid, 'IN_CONVERSATION', 'INSTAGRAM', NULL, NULL, true) AS lead_id\n), inbound_log AS (\n  SELECT public.sync_message_event_to_outreach_log((SELECT event_id FROM event_insert), (SELECT lead_id FROM lead_sync), 'INBOUND_MESSAGE') AS log_id\n)\nSELECT\n  (SELECT event_id FROM event_insert) AS event_id,\n  (SELECT lead_id FROM lead_sync) AS lead_id,\n  (SELECT log_id FROM inbound_log) AS inbound_log_id,\n  {{ JSON.stringify($json.contact_id) }}::uuid AS contact_id,\n  {{ JSON.stringify($json.thread_id) }}::uuid AS thread_id,\n  {{ JSON.stringify($json.contact_channel_identity_id) }}::uuid AS identity_id,\n  COALESCE((SELECT ai_engagement_score FROM contact_update), 0) AS ai_engagement_score"
+      },
+      "id": "ig-append-inbound",
+      "name": "Append Inbound Event",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1960, 260],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  t.human_handoff,\n  coalesce(cci.is_opted_out, false) AS is_opted_out,\n  (\n    SELECT COUNT(*)\n    FROM public.message_events me\n    WHERE me.thread_id = t.id\n      AND me.direction = 'OUTBOUND'\n      AND me.actor = 'BOT'\n      AND me.created_at > coalesce((SELECT max(me2.created_at) FROM public.message_events me2 WHERE me2.thread_id = t.id AND me2.direction = 'INBOUND'), to_timestamp(0))\n  ) AS consecutive_bot_outbound,\n  (\n    SELECT max(me.created_at)\n    FROM public.message_events me\n    WHERE me.thread_id = t.id\n      AND me.direction = 'INBOUND'\n  ) AS last_inbound_at\nFROM public.threads t\nJOIN public.contact_channel_identities cci ON cci.id = {{ JSON.stringify($node[\"Append Inbound Event\"].json.identity_id) }}::uuid\nWHERE t.id = {{ JSON.stringify($node[\"Append Inbound Event\"].json.thread_id) }}::uuid"
+      },
+      "id": "ig-load-guardrails",
+      "name": "Check Compliance Gates",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2180, 260],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const gates = $input.first().json || {};\nconst lastInboundAt = gates.last_inbound_at ? new Date(gates.last_inbound_at).getTime() : Date.now();\nconst within24h = (Date.now() - lastInboundAt) <= (24 * 60 * 60 * 1000);\nlet blockedBy = null;\nif (gates.is_opted_out) blockedBy = 'opt_out';\nelse if (gates.human_handoff) blockedBy = 'human_handoff';\nelse if (!within24h) blockedBy = 'outside_24h_window';\nelse if (Number(gates.consecutive_bot_outbound || 0) >= 3) blockedBy = 'too_many_bot_outbound';\nreturn [{ json: { ...gates, can_reply: !blockedBy, blocked_by: blockedBy } }];"
+      },
+      "id": "ig-apply-guardrails",
+      "name": "Apply Guardrails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2400, 260]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "can-reply",
+              "leftValue": "={{$json.can_reply}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "ig-can-reply",
+      "name": "Can Auto Reply?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2620, 260]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  CASE\n    WHEN me.direction = 'INBOUND' THEN 'LEAD'\n    WHEN me.actor = 'BOT' THEN 'BOT'\n    WHEN me.actor = 'HUMAN' THEN 'HUMAN'\n    ELSE me.direction\n  END AS direction,\n  COALESCE(me.normalized_text, me.text_body, me.provider_message_id, '[sin texto]') AS message_text,\n  me.created_at\nFROM public.message_events me\nWHERE me.thread_id = {{ JSON.stringify($node[\"Append Inbound Event\"].json.thread_id) }}::uuid\nORDER BY me.created_at DESC\nLIMIT 10"
+      },
+      "id": "ig-get-history",
+      "name": "Load Conversation Context",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2840, 160],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT key, segment, stage, type, title, content, priority, topic\nFROM nv_playbook\nWHERE active = true\nORDER BY priority ASC"
+      },
+      "id": "ig-get-playbook",
+      "name": "Get NV Playbook",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [3060, 160],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const playbook = $input.first().json || [];\nconst playbookArr = Array.isArray(playbook) ? playbook : [];\nconst sections = playbookArr.sort((a, b) => (a.priority || 0) - (b.priority || 0)).map(p => `### ${p.title}\\n${p.content}`).join('\\n\\n');\nconst systemPrompt = `Sos NovaBot, asistente comercial de NovaVision para Instagram DM.\\n\\nREGLAS ABSOLUTAS:\\n1. Responder siempre en español argentino, corto y claro.\\n2. No inventar precios ni promociones.\\n3. No insistir si el usuario pide frenar o hablar con humano.\\n4. No inventar rubro ni contexto que el lead no haya dicho.\\n5. Mantener mensajes aptos para DM, máximo 300 caracteres.\\n\\nFORMATO JSON OBLIGATORIO:\\n{\\n  \"reply\": \"texto\",\\n  \"engagement_delta\": -10 a 20,\\n  \"conversation_stage\": \"INTRO|DISCOVERY|FOLLOWUP|CLOSING|DEMO_OFFERED|DEMO_BOOKED\",\\n  \"intent\": \"interested|curious|objection|not_interested|spam|human_request\",\\n  \"should_notify_sales\": true/false,\\n  \"reasoning\": \"explicacion interna\"\\n}\\n\\nPLAYBOOK:\\n${sections || '(sin playbook)'}`;\nreturn [{ json: { system_prompt: systemPrompt } }];"
+      },
+      "id": "ig-build-prompt",
+      "name": "Build AI Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3280, 160]
+    },
+    {
+      "parameters": {
+        "jsCode": "const history = $node['Load Conversation Context'].json || [];\nconst historyArr = Array.isArray(history) ? history : [];\nconst inbound = $node['Parse Instagram Event'].json;\nconst historyText = historyArr.reverse().map(h => `${h.direction}: ${h.message_text}`).join('\\n');\nreturn [{ json: {\n  thread_id: $node['Append Inbound Event'].json.thread_id,\n  contact_id: $node['Append Inbound Event'].json.contact_id,\n  identity_id: $node['Append Inbound Event'].json.identity_id,\n  lead_id: $node['Append Inbound Event'].json.lead_id,\n  ai_engagement_score: Number($node['Append Inbound Event'].json.ai_engagement_score || 0),\n  input_text: inbound.normalized_text,\n  from_user_id: inbound.external_user_id,\n  channel_account_id: inbound.channel_account_id,\n  display_name: inbound.external_display_name || 'Instagram Lead',\n  conversation_history: historyText\n} }];"
+      },
+      "id": "ig-prepare-context",
+      "name": "Prepare AI Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3500, 160]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "={{$node['Build AI Prompt'].json.system_prompt}}"
+            },
+            {
+              "role": "user",
+              "content": "=LEAD: {{$json.display_name}}\nHISTORIAL:\n{{$json.conversation_history}}\n---\nMENSAJE: {{$json.input_text}}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 400
+        }
+      },
+      "id": "ig-ai-closer",
+      "name": "AI Closer Brain",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [3720, 160],
+      "credentials": {
+        "openAiApi": {
+          "id": "2T4ykWJki0wAQvUx",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\nlet aiOutput;\ntry {\n  const content = raw.message?.content || raw.choices?.[0]?.message?.content || '';\n  aiOutput = JSON.parse(content.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim());\n} catch (e) {\n  aiOutput = { reply: 'Gracias por escribirnos. Un asesor te responde a la brevedad.', engagement_delta: 0, conversation_stage: 'INTRO', intent: 'human_request', should_notify_sales: true, reasoning: 'JSON parse failed' };\n}\nconst prev = $node['Prepare AI Context'].json;\nconst validStages = ['INTRO', 'DISCOVERY', 'FOLLOWUP', 'CLOSING', 'DEMO_OFFERED', 'DEMO_BOOKED'];\nconst reply = String(aiOutput.reply || '').substring(0, 300);\nconst engagementDelta = Math.max(-10, Math.min(20, parseInt(aiOutput.engagement_delta) || 0));\nconst nextStage = validStages.includes(aiOutput.conversation_stage) ? aiOutput.conversation_stage : 'INTRO';\nconst newScore = Math.max(0, Math.min(100, Number(prev.ai_engagement_score || 0) + engagementDelta));\nconst isHot = newScore >= 80 || !!aiOutput.should_notify_sales;\nreturn [{ json: {\n  ...prev,\n  reply,\n  new_score: newScore,\n  new_stage: nextStage,\n  intent: aiOutput.intent || 'unknown',\n  should_notify_sales: !!aiOutput.should_notify_sales,\n  is_hot: isHot,\n  reasoning: aiOutput.reasoning || ''\n} }];"
+      },
+      "id": "ig-post-process",
+      "name": "Post-process AI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3940, 160]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH contact_update AS (\n  UPDATE public.contacts c\n     SET ai_engagement_score = {{ $json.new_score }},\n         conversation_stage = {{ JSON.stringify($json.new_stage) }},\n         hot_lead = {{ $json.is_hot }},\n         ai_state = COALESCE(c.ai_state, '{}'::jsonb) || jsonb_build_object('intent', {{ JSON.stringify($json.intent) }}, 'score', {{ $json.new_score }}, 'stage', {{ JSON.stringify($json.new_stage) }}, 'reasoning', {{ JSON.stringify($json.reasoning) }}),\n         updated_at = NOW()\n   WHERE c.id = {{ JSON.stringify($json.contact_id) }}::uuid\n   RETURNING c.id\n)\nSELECT public.sync_contact_to_outreach_lead({{ JSON.stringify($json.contact_id) }}::uuid, {{ JSON.stringify($json.identity_id) }}::uuid, 'IN_CONVERSATION', 'INSTAGRAM', NULL, NULL, true) AS id"
+      },
+      "id": "ig-update-intel",
+      "name": "Sync Legacy Read Model",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [4160, 160],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/{{$env.META_GRAPH_VERSION || 'v22.0'}}/{{$env.META_IG_REPLY_ENDPOINT_ID || $json.channel_account_id}}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.META_IG_ACCESS_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipient\": { \"id\": \"{{$node['Post-process AI'].json.from_user_id}}\" },\n  \"messaging_type\": \"RESPONSE\",\n  \"message\": { \"text\": \"{{$node['Post-process AI'].json.reply}}\" }\n}",
+        "options": {}
+      },
+      "id": "ig-send-reply",
+      "name": "Send IG Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4380, 160],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH event_insert AS (\n  SELECT public.append_message_event(\n    {{ JSON.stringify($node[\"Post-process AI\"].json.thread_id) }}::uuid,\n    {{ JSON.stringify($node[\"Post-process AI\"].json.contact_id) }}::uuid,\n    'INSTAGRAM',\n    'META',\n    'OUTBOUND',\n    'BOT',\n    'MESSAGE',\n    'TEXT',\n    {{ JSON.stringify($json.message_id || '') }},\n    NULL,\n    {{ JSON.stringify(($json.message_id ? 'ig-bot:' + $json.message_id : null)) }},\n    {{ JSON.stringify($node[\"Post-process AI\"].json.reply) }},\n    {{ JSON.stringify($node[\"Post-process AI\"].json.reply) }},\n    NULL,\n    NULL,\n    NULL,\n    NULL,\n    'SENT',\n    'PROCESSED',\n    NULL,\n    NULL,\n    jsonb_build_object('intent', {{ JSON.stringify($node[\"Post-process AI\"].json.intent) }}, 'score', {{ $node[\"Post-process AI\"].json.new_score }}, 'stage', {{ JSON.stringify($node[\"Post-process AI\"].json.new_stage) }}),\n    NOW(),\n    NULL\n  ) AS event_id\n)\nSELECT public.sync_message_event_to_outreach_log((SELECT event_id FROM event_insert), {{ $node[\"Post-process AI\"].json.lead_id }}, 'BOT_REPLY') AS id"
+      },
+      "id": "ig-append-outbound",
+      "name": "Append Outbound Event",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [4600, 160],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "is-hot",
+              "leftValue": "={{$node['Post-process AI'].json.is_hot}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "ig-is-hot",
+      "name": "Hot Lead Alert",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [4820, 160]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{$env.WHATSAPP_PHONE_NUMBER_ID}}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.WHATSAPP_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{$env.SALES_ALERT_PHONE}}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"🔥 HOT LEAD IG\\nUsuario: {{$node['Prepare AI Context'].json.display_name}}\\nIG User ID: {{$node['Prepare AI Context'].json.from_user_id}}\\nIntent: {{$node['Post-process AI'].json.intent}}\\nMensaje: {{$node['Prepare AI Context'].json.input_text}}\" }\n}",
+        "options": {}
+      },
+      "id": "ig-notify-sales",
+      "name": "Notify Sales",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [5040, 80],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.compliance_events (\n  thread_id,\n  contact_id,\n  channel,\n  provider,\n  compliance_type,\n  reason,\n  payload,\n  created_at\n)\nVALUES (\n  {{ JSON.stringify($node[\"Append Inbound Event\"].json.thread_id) }}::uuid,\n  {{ JSON.stringify($node[\"Append Inbound Event\"].json.contact_id) }}::uuid,\n  'INSTAGRAM',\n  'META',\n  CASE {{ JSON.stringify($json.blocked_by) }}\n    WHEN 'opt_out' THEN 'OPT_OUT'\n    WHEN 'outside_24h_window' THEN 'WINDOW_BLOCK'\n    WHEN 'too_many_bot_outbound' THEN 'RATE_LIMIT_BLOCK'\n    ELSE 'MANUAL_REVIEW'\n  END,\n  {{ JSON.stringify($json.blocked_by || 'blocked') }},\n  jsonb_build_object('workflow', 'ig-inbound', 'blocked_by', {{ JSON.stringify($json.blocked_by || 'blocked') }}),\n  NOW()\n)\nRETURNING id"
+      },
+      "id": "ig-log-block",
+      "name": "Log Compliance Block",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [2840, 360],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook IG Inbound": { "main": [[{ "node": "Respond 200 OK", "type": "main", "index": 0 }]] },
+    "Respond 200 OK": { "main": [[{ "node": "Verify Meta Signature", "type": "main", "index": 0 }]] },
+    "Verify Meta Signature": { "main": [[{ "node": "Parse Instagram Event", "type": "main", "index": 0 }]] },
+    "Parse Instagram Event": { "main": [[{ "node": "Filter Unsupported Events", "type": "main", "index": 0 }]] },
+    "Filter Unsupported Events": { "main": [[], [{ "node": "Check IG Dedup", "type": "main", "index": 0 }]] },
+    "Check IG Dedup": { "main": [[{ "node": "Already Processed?", "type": "main", "index": 0 }]] },
+    "Already Processed?": { "main": [[], [{ "node": "Resolve Contact + Thread", "type": "main", "index": 0 }]] },
+    "Resolve Contact + Thread": { "main": [[{ "node": "Append Inbound Event", "type": "main", "index": 0 }]] },
+    "Append Inbound Event": { "main": [[{ "node": "Check Compliance Gates", "type": "main", "index": 0 }]] },
+    "Check Compliance Gates": { "main": [[{ "node": "Apply Guardrails", "type": "main", "index": 0 }]] },
+    "Apply Guardrails": { "main": [[{ "node": "Can Auto Reply?", "type": "main", "index": 0 }]] },
+    "Can Auto Reply?": { "main": [[{ "node": "Log Compliance Block", "type": "main", "index": 0 }], [{ "node": "Load Conversation Context", "type": "main", "index": 0 }]] },
+    "Load Conversation Context": { "main": [[{ "node": "Get NV Playbook", "type": "main", "index": 0 }]] },
+    "Get NV Playbook": { "main": [[{ "node": "Build AI Prompt", "type": "main", "index": 0 }]] },
+    "Build AI Prompt": { "main": [[{ "node": "Prepare AI Context", "type": "main", "index": 0 }]] },
+    "Prepare AI Context": { "main": [[{ "node": "AI Closer Brain", "type": "main", "index": 0 }]] },
+    "AI Closer Brain": { "main": [[{ "node": "Post-process AI", "type": "main", "index": 0 }]] },
+    "Post-process AI": { "main": [[{ "node": "Sync Legacy Read Model", "type": "main", "index": 0 }]] },
+    "Sync Legacy Read Model": { "main": [[{ "node": "Send IG Reply", "type": "main", "index": 0 }]] },
+    "Send IG Reply": { "main": [[{ "node": "Append Outbound Event", "type": "main", "index": 0 }], []] },
+    "Append Outbound Event": { "main": [[{ "node": "Hot Lead Alert", "type": "main", "index": 0 }]] },
+    "Hot Lead Alert": { "main": [[{ "node": "Notify Sales", "type": "main", "index": 0 }], []] }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "outreach-v2" },
+    { "name": "instagram" },
+    { "name": "inbound" }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2026-03-08T00:00:00.000Z",
+  "versionId": "ig-inbound-v1"
+}
