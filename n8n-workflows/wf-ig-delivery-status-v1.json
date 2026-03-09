@@ -1,0 +1,146 @@
+{
+  "name": "WF-IG-DELIVERY-STATUS-V1 — Instagram Delivery Status",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ig-status",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ig-status-webhook",
+      "name": "Webhook Meta Status",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 240],
+      "webhookId": "ig-status-v1"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\":\"ok\"}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "ig-status-respond",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [440, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json || {};\nif (input.relay?.validated_by_api === true) {\n  return $input.all();\n}\nthrow new Error('Direct Meta traffic not supported in this workflow. Route Instagram status webhooks through NovaVision API /webhooks/instagram.');"
+      },
+      "id": "ig-status-verify",
+      "name": "Verify Meta Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst entry = body?.entry?.[0] || {};\nconst messaging = entry?.messaging?.[0] || null;\nconst delivery = messaging?.delivery || null;\nconst read = messaging?.read || null;\nconst message = delivery || read || null;\nif (!message) return [{ json: { is_supported_event: false } }];\nconst mids = message.mids || [];\nreturn mids.map(mid => ({ json: {\n  is_supported_event: true,\n  channel: 'INSTAGRAM',\n  provider: 'META',\n  provider_message_id: mid,\n  delivery_status: read ? 'READ' : 'DELIVERED',\n  event_at: new Date(message.watermark || Date.now()).toISOString(),\n  raw_payload: messaging\n} }));"
+      },
+      "id": "ig-status-parse",
+      "name": "Parse Status Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "supported",
+              "leftValue": "={{$json.is_supported_event}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "ig-status-supported",
+      "name": "Supported Status?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 240]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "ig-status-loop",
+      "name": "Loop Status Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1320, 240]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT me.id AS message_event_id, me.thread_id, me.contact_id, me.provider_status\nFROM public.message_events me\nWHERE me.channel = 'INSTAGRAM'\n  AND me.provider = 'META'\n  AND me.provider_message_id = {{ JSON.stringify($json.provider_message_id) }}\nORDER BY me.created_at DESC\nLIMIT 1"
+      },
+      "id": "ig-status-resolve",
+      "name": "Resolve Message Event",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1540, 240],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH delivery_insert AS (\n  INSERT INTO public.delivery_events (\n    message_event_id,\n    thread_id,\n    channel,\n    provider,\n    provider_message_id,\n    delivery_status,\n    raw_payload,\n    event_at\n  )\n  VALUES (\n    {{ JSON.stringify($json.message_event_id) }}::uuid,\n    {{ JSON.stringify($json.thread_id) }}::uuid,\n    'INSTAGRAM',\n    'META',\n    {{ JSON.stringify($node[\"Parse Status Event\"].json.provider_message_id) }},\n    {{ JSON.stringify($node[\"Parse Status Event\"].json.delivery_status) }},\n    {{ JSON.stringify(JSON.stringify($node[\"Parse Status Event\"].json.raw_payload || {})) }}::jsonb,\n    {{ JSON.stringify($node[\"Parse Status Event\"].json.event_at) }}::timestamptz\n  )\n  ON CONFLICT (channel, provider, provider_message_id, delivery_status) DO NOTHING\n  RETURNING id\n), message_update AS (\n  UPDATE public.message_events me\n     SET provider_status = {{ JSON.stringify($node[\"Parse Status Event\"].json.delivery_status) }},\n         processing_status = CASE WHEN {{ JSON.stringify($node[\"Parse Status Event\"].json.delivery_status) }} = 'READ' THEN 'REPLIED' ELSE me.processing_status END\n   WHERE me.id = {{ JSON.stringify($json.message_event_id) }}::uuid\n   RETURNING me.id\n)\nSELECT {{ JSON.stringify($json.message_event_id) }}::uuid AS message_event_id"
+      },
+      "id": "ig-status-upsert",
+      "name": "Insert delivery_events + Update message_events",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1760, 240],
+      "credentials": {
+        "postgres": {
+          "id": "ADMIN_DB_CREDENTIAL_ID",
+          "name": "Admin DB"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Meta Status": { "main": [[{ "node": "Respond 200 OK", "type": "main", "index": 0 }]] },
+    "Respond 200 OK": { "main": [[{ "node": "Verify Meta Signature", "type": "main", "index": 0 }]] },
+    "Verify Meta Signature": { "main": [[{ "node": "Parse Status Event", "type": "main", "index": 0 }]] },
+    "Parse Status Event": { "main": [[{ "node": "Supported Status?", "type": "main", "index": 0 }]] },
+    "Supported Status?": { "main": [[{ "node": "Loop Status Items", "type": "main", "index": 0 }], []] },
+    "Loop Status Items": { "main": [[{ "node": "Resolve Message Event", "type": "main", "index": 0 }], []] },
+    "Resolve Message Event": { "main": [[{ "node": "Insert delivery_events + Update message_events", "type": "main", "index": 0 }]] },
+    "Insert delivery_events + Update message_events": { "main": [[{ "node": "Loop Status Items", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "outreach-v2" },
+    { "name": "instagram" },
+    { "name": "status" }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2026-03-08T00:00:00.000Z",
+  "versionId": "ig-status-v1"
+}

@@ -1,0 +1,65 @@
+{
+  "name": "WF-IG-WEBHOOK-VERIFY-V1 — Instagram Webhook Verify",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "ig-inbound",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ig-verify-webhook",
+      "name": "Webhook IG Verify",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 260],
+      "webhookId": "ig-inbound-verify-v1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { statusCode: 410, responseBody: 'Deprecated. Configure Meta webhook verification against NovaVision API /webhooks/instagram.' } }];"
+      },
+      "id": "ig-verify-challenge",
+      "name": "Validate Verify Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 260]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $node[\"Validate Verify Token\"].json[\"responseBody\"] }}",
+        "options": {
+          "responseCode": "={{ $node[\"Validate Verify Token\"].json[\"statusCode\"] }}"
+        }
+      },
+      "id": "ig-verify-respond-ok",
+      "name": "Respond Verify Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [720, 260]
+    }
+  ],
+  "connections": {
+    "Webhook IG Verify": { "main": [[{ "node": "Validate Verify Token", "type": "main", "index": 0 }]] },
+    "Validate Verify Token": { "main": [[{ "node": "Respond Verify Result", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "outreach-v2" },
+    { "name": "instagram" },
+    { "name": "verify" }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2026-03-08T00:00:00.000Z",
+  "versionId": "ig-webhook-verify-v1",
+  "id": "qN4sT8vK2mLp7XcR",
+  "active": false,
+  "isArchived": false
+}
