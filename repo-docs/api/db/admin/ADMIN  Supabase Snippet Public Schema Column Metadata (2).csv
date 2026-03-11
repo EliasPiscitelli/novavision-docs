@@ -1,0 +1,63 @@
+table_schema,table_name,policy_name,using_expression,with_check_expression,for_command
+public,app_settings,app_settings_authenticated_select,true,null,r
+public,app_settings,app_settings_public_select,(is_public = true),null,r
+public,app_settings,app_settings_service_all,(auth.role() = 'service_role'::text),(auth.role() = 'service_role'::text),*
+public,billing_cycle,billing_cycle_admin_all,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),*
+public,billing_cycle,billing_cycle_service_all,true,true,*
+public,client_extra_costs,client_extra_costs_admin_all,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),*
+public,client_extra_costs,client_extra_costs_service_all,true,true,*
+public,client_extra_costs,client_extra_costs_service_role,(auth.role() = 'service_role'::text),(auth.role() = 'service_role'::text),*
+public,client_tombstones,client_tombstones_admin_all,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),*
+public,client_tombstones,client_tombstones_service_all,true,true,*
+public,client_usage_month,client_usage_month_admin_all,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),*
+public,client_usage_month,client_usage_month_service_all,true,true,*
+public,client_usage_month,client_usage_month_service_role_all,(auth.role() = 'service_role'::text),(auth.role() = 'service_role'::text),*
+public,client_usage_month,usage_service_role_all,true,true,*
+public,clients,Admin can delete clients,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),null,d
+public,clients,Admin can insert clients,null,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),a
+public,clients,Admin can select clients,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),null,r
+public,clients,Admin can update clients,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),null,w
+public,dashboard_admins,dashboard_admins_admin_all,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),*
+public,dashboard_admins,dashboard_admins_service_all,true,true,*
+public,invoices,Admin can delete invoices,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),null,d
+public,invoices,Admin can insert invoices,null,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),a
+public,invoices,Admin can select invoices,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),null,r
+public,invoices,Admin can update invoices,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),null,w
+public,invoices,invoices_service_role_all,true,true,*
+public,lead_assets,lead_assets_admin_all,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),*
+public,lead_assets,lead_assets_anon_insert,null,true,a
+public,lead_assets,lead_assets_service_all,true,true,*
+public,leads,leads_admin_all,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),*
+public,leads,leads_anon_insert,null,true,a
+public,leads,leads_service_all,true,true,*
+public,meetings,meetings_admin_select,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),null,r
+public,meetings,meetings_service_all,true,true,*
+public,metering_prices,metering_prices_read_admin,is_dashboard_admin(),null,r
+public,metering_prices,metering_prices_service_role,(auth.role() = 'service_role'::text),(auth.role() = 'service_role'::text),*
+public,nv_playbook,nv_playbook_admin_all,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),*
+public,nv_playbook,nv_playbook_service_all,true,true,*
+public,orders_bridge,orders_bridge_service_role,(auth.role() = 'service_role'::text),(auth.role() = 'service_role'::text),*
+public,outreach_leads,outreach_leads_admin_all,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),*
+public,outreach_leads,outreach_leads_service_all,true,true,*
+public,outreach_logs,outreach_logs_service_all,true,true,*
+public,payments,Admin can delete payments,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),null,d
+public,payments,Admin can insert payments,null,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),a
+public,payments,Admin can select payments,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),null,r
+public,payments,Admin can update payments,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),null,w
+public,plan_catalog,plan_catalog_admin_all,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),*
+public,plan_catalog,plan_catalog_service_all,true,true,*
+public,sync_cursors,cursors_service_role_all,true,true,*
+public,sync_cursors,sync_cursors_service_role_all,(auth.role() = 'service_role'::text),(auth.role() = 'service_role'::text),*
+public,usage_daily,usage_daily_service_role,(auth.role() = 'service_role'::text),(auth.role() = 'service_role'::text),*
+public,usage_daily_legacy,usage_daily_read_admin,is_dashboard_admin(),null,r
+public,usage_daily_legacy,usage_daily_service_role,(auth.role() = 'service_role'::text),(auth.role() = 'service_role'::text),*
+public,usage_event,usage_event_service_role,(auth.role() = 'service_role'::text),(auth.role() = 'service_role'::text),*
+public,usage_hourly,usage_hourly_service_role,(auth.role() = 'service_role'::text),(auth.role() = 'service_role'::text),*
+public,usage_ledger,usage_ledger_service_role,(auth.role() = 'service_role'::text),(auth.role() = 'service_role'::text),*
+public,users,Admin can delete users,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),null,d
+public,users,Admin can insert users,null,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),a
+public,users,Admin can select users,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),null,r
+public,users,Admin can update users,(auth.uid() = 'a1b4ca03-3873-440e-8d81-802c677c5439'::uuid),null,w
+public,users,Allow insert with service role,null,true,a
+public,users,Insertar usuario si tiene rol válido,null,"((current_setting('request.jwt.claim.role'::text, true) = 'service_role'::text) OR (id = auth.uid()))",a
+public,users,Usuarios pueden leerse a sí mismos,(id = auth.uid()),null,r

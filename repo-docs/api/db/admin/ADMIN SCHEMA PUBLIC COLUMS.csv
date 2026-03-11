@@ -1,0 +1,101 @@
+table_name,column_name,data_type,character_maximum_length,is_nullable,column_default
+account_addons,id,uuid,null,NO,gen_random_uuid()
+account_addons,account_id,uuid,null,NO,null
+account_addons,addon_id,text,null,NO,null
+account_addons,quantity,integer,null,NO,1
+account_addons,status,text,null,NO,'active'::text
+account_addons,purchased_at,timestamp with time zone,null,NO,now()
+account_entitlements,account_id,uuid,null,NO,null
+account_entitlements,plan_code,text,null,NO,null
+account_entitlements,entitlements,jsonb,null,NO,'{}'::jsonb
+account_entitlements,updated_at,timestamp with time zone,null,NO,now()
+addon_catalog,addon_id,text,null,NO,null
+addon_catalog,name,text,null,NO,null
+addon_catalog,type,text,null,NO,null
+addon_catalog,billing_model,text,null,NO,null
+addon_catalog,price_usd,numeric,null,NO,null
+addon_catalog,limits_delta,jsonb,null,YES,'{}'::jsonb
+addon_catalog,features_delta,jsonb,null,YES,'{}'::jsonb
+addon_catalog,active,boolean,null,NO,true
+addon_catalog,created_at,timestamp with time zone,null,NO,now()
+app_settings,id,uuid,null,NO,gen_random_uuid()
+app_settings,key,text,null,NO,null
+app_settings,value,text,null,NO,null
+app_settings,is_public,boolean,null,NO,false
+app_settings,description,text,null,YES,null
+app_settings,created_at,timestamp with time zone,null,NO,now()
+app_settings,updated_at,timestamp with time zone,null,NO,now()
+backend_clusters,id,text,null,NO,null
+backend_clusters,name,text,null,NO,null
+backend_clusters,backend_db_url,text,null,NO,null
+backend_clusters,capacity_hint,integer,null,NO,1000
+backend_clusters,status,text,null,NO,'active'::text
+backend_clusters,created_at,timestamp with time zone,null,NO,now()
+billing_cycle,client_id,uuid,null,NO,null
+billing_cycle,current_period_start,date,null,NO,null
+billing_cycle,current_period_end,date,null,NO,null
+client_extra_costs,month,date,null,NO,null
+client_extra_costs,client_id,uuid,null,NO,null
+client_extra_costs,description,text,null,NO,null
+client_extra_costs,amount_usd,numeric,null,NO,null
+client_tombstones,client_id,uuid,null,NO,null
+client_tombstones,slug,text,null,YES,null
+client_tombstones,name,text,null,YES,null
+client_tombstones,plan,text,null,YES,null
+client_tombstones,created_at,timestamp with time zone,null,YES,null
+client_tombstones,deleted_at,timestamp with time zone,null,YES,now()
+client_tombstones,deleted_by,uuid,null,YES,null
+client_tombstones,reason,text,null,YES,null
+client_tombstones,snapshot,jsonb,null,YES,null
+client_usage_month,client_id,uuid,null,NO,null
+client_usage_month,period,text,null,NO,null
+client_usage_month,orders_count,integer,null,YES,0
+client_usage_month,revenue,numeric,null,YES,0
+client_usage_month,storage_mb,numeric,null,YES,0
+client_usage_month,imported_at,timestamp with time zone,null,YES,now()
+clients,id,uuid,null,NO,gen_random_uuid()
+clients,name,text,null,NO,null
+clients,email_admin,text,null,NO,null
+clients,plan,text,null,NO,null
+clients,monthly_fee,numeric,null,NO,0
+clients,base_url,text,null,NO,null
+clients,connection_type,text,null,NO,'manual'::text
+clients,created_at,timestamp with time zone,null,YES,now()
+clients,needs_db_setup,boolean,null,YES,false
+clients,dedicated_db_url,text,null,YES,null
+clients,dedicated_db_service_key,text,null,YES,null
+clients,logo_url,text,null,YES,null
+clients,mp_public_key,text,null,YES,null
+clients,mp_access_token,text,null,YES,null
+clients,is_active,boolean,null,YES,true
+clients,setup_paid,boolean,null,YES,false
+clients,setup_paid_at,timestamp with time zone,null,YES,null
+clients,plan_paid_until,date,null,YES,null
+clients,last_payment_at,timestamp with time zone,null,YES,null
+clients,payment_type,text,null,YES,null
+clients,payment_amount,numeric,null,YES,null
+clients,payment_method,text,null,YES,null
+clients,last_plan_change_at,timestamp with time zone,null,YES,null
+clients,suspension_reason,text,null,YES,null
+clients,discount_percent,numeric,null,YES,null
+clients,promo_code,text,null,YES,null
+clients,free_months,integer,null,YES,null
+clients,notes,text,null,YES,null
+clients,phone,text,null,YES,null
+clients,commission_percent,numeric,null,YES,0
+clients,deleted_at,timestamp with time zone,null,YES,null
+clients,slug,text,null,NO,null
+clients,status,text,null,NO,'active'::text
+clients,backend_url,text,null,YES,null
+clients,supabase_url,text,null,YES,null
+clients,supabase_key,text,null,YES,null
+clients,country,text,null,YES,null
+clients,currency,text,null,YES,null
+clients,timezone,text,null,YES,null
+clients,locale,text,null,YES,'es'::text
+clients,domain,text,null,YES,null
+clients,external_id,text,null,YES,null
+clients,flags,jsonb,null,NO,'{}'::jsonb
+clients,updated_at,timestamp with time zone,null,NO,now()
+clients_deleted,id,uuid,null,YES,null
+clients_deleted,name,text,null,YES,null
