@@ -355,6 +355,54 @@ Los `componentKey` que el builder genera tienen que existir en:
 
 Si falta alguno de esos pasos, el preview o la tienda publicada van a renderizar `null` o caer en fallback.
 
+### Paso 4: registrar en el VARIANT_REGISTRY del API
+
+Desde Fase 5 del plan de Store Design, el backend valida `component_key` contra un **VARIANT_REGISTRY** server-side. Si un nuevo `componentKey` no está en ese registro, el API lo rechazará.
+
+Archivo: `apps/api/src/home/registry/sections.ts`
+
+El registro tiene esta estructura:
+
+```ts
+export const VARIANT_REGISTRY: Record<string, VariantDef> = {
+  'hero.first':     { type: 'hero', displayName: 'Hero – First',     planMin: 'starter' },
+  'hero.ninth':     { type: 'hero', displayName: 'Hero – Ninth',     planMin: 'enterprise' },
+  // ... 68 entradas total
+};
+```
+
+Cada entrada define:
+- **`type`**: a qué tipo de sección pertenece (debe coincidir con el `type` que se envía en el DTO)
+- **`displayName`**: nombre legible para UI
+- **`planMin`**: plan mínimo requerido (`starter`, `growth`, `enterprise`)
+
+Para agregar una variante nueva:
+
+```ts
+// En VARIANT_REGISTRY dentro de sections.ts
+'hero.ninth':     { type: 'hero', displayName: 'Hero – Ninth',     planMin: 'starter' },
+```
+
+**Helpers disponibles:**
+- `getVariantsForType(type)` — devuelve todas las variantes de un tipo (ej: `getVariantsForType('hero')` → array de variants)
+- `getVariantDef(componentKey)` — busca una variante por key (ej: `getVariantDef('hero.ninth')` → `VariantDef | undefined`)
+
+### Paso 5: entender la validación server-side
+
+Cuando se llama a `POST /home/sections` (addSection) o `PUT /home/sections/:id/replace` (replaceSection) con `component_key`, el servicio valida:
+
+1. **Existencia**: `component_key` debe existir en `VARIANT_REGISTRY` → error `INVALID_COMPONENT_KEY` (400)
+2. **Coincidencia de tipo**: `variant.type` debe coincidir con el `type` del DTO → error `COMPONENT_KEY_TYPE_MISMATCH` (400)
+3. **Plan gating**: el plan del cliente debe ser >= `variant.planMin` → error `VARIANT_GATED` (403)
+
+Si `component_key` no se envía (null/undefined), la validación se omite — compatibilidad hacia atrás.
+
+### Paso 6: verificar persistencia en BD
+
+La tabla `home_sections` tiene una columna `component_key TEXT` (nullable). Cuando el API persiste una sección, guarda `component_key` si fue provisto. Esto permite que `GET /home/data` devuelva el variant key correcto para el rendering en web.
+
+El endpoint `GET /home/sections/registry` devuelve para cada tipo un array `variants[]` con las variantes disponibles y su `planMin`.
+
 ---
 
 ## 7. Diferencia entre preview y tienda publicada
@@ -385,8 +433,12 @@ Antes de considerar terminado un template nuevo, verificar:
 | 6 | `apps/web/src/registry/sectionComponentTemplates/*` | Re-exports del template |
 | 7 | `apps/admin/src/services/builder/designSystem.ts` | Presets / catalogo consistentes |
 | 8 | `apps/api/src/home/home-settings.service.ts` | Clave canonica valida y fallback correcto |
-| 9 | Preview builder | Renderiza via `/preview` |
-| 10 | Store publicada | Renderiza via `/home/data` |
+| 9 | `apps/api/src/home/registry/sections.ts` | Nuevos `componentKey` agregados al `VARIANT_REGISTRY` con `type` y `planMin` correctos |
+| 10 | BD `home_sections` | Columna `component_key` existe (migración `BACKEND_051`) |
+| 11 | `GET /home/sections/registry` | Endpoint devuelve `variants[]` incluyendo las nuevas keys |
+| 12 | Validación server en `addSection()`/`replaceSection()` | Probar con keys inválidas, type mismatch y plan insuficiente |
+| 13 | Preview builder | Renderiza via `/preview` |
+| 14 | Store publicada | Renderiza via `/home/data` |
 
 ---
 
@@ -414,6 +466,20 @@ Posibles causas:
 
 - falta mapear el template en `resolveEffectiveTheme.ts`
 - `paletteVars` o `paletteKey` estan cayendo en fallback
+
+### El API rechaza el component_key al agregar/reemplazar sección
+
+Posibles causas y errores:
+
+- **`INVALID_COMPONENT_KEY` (400)**: el `component_key` no existe en `VARIANT_REGISTRY`. Verificar que el key esté registrado en `apps/api/src/home/registry/sections.ts`.
+- **`COMPONENT_KEY_TYPE_MISMATCH` (400)**: el `component_key` pertenece a un tipo diferente al que se está enviando. Ej: enviaste `type: 'features'` con `component_key: 'hero.first'` (que es tipo `hero`).
+- **`VARIANT_GATED` (403)**: la variante requiere un plan superior al del cliente. Ej: variante requiere `enterprise` pero el cliente tiene plan `starter`.
+
+Verificar:
+- Que el `componentKey` esté en `VARIANT_REGISTRY` en `sections.ts`
+- Que `variant.type` coincida con el `type` del DTO
+- Que el plan del cliente sea >= `variant.planMin`
+- Consultar variantes disponibles via `GET /home/sections/registry`
 
 ---
 
