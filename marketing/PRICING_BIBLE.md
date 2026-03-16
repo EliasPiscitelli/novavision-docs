@@ -14,7 +14,7 @@
 | **Growth** | $60 USD | $600 USD | $0 | Empezar gratis |
 | **Enterprise** | $390 USD | $3,500 USD | Consultar (caso a caso) | Consultar |
 
-**Nota:** La DB (plans table) todavía tiene Enterprise a $250/mo — requiere migración para unificar a $390/mo.
+**Confirmado:** DB unificada — migración ADMIN_066 ya tiene Enterprise a $390/mo y $3,900/año.
 
 ---
 
