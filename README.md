@@ -8,6 +8,7 @@ Repositorio central de documentación, reglas, arquitectura y registro de cambio
 novavision-docs/
 ├── architecture/     ← Documentación de arquitectura del sistema
 ├── rules/            ← Reglas fijas y convenciones
+├── runbooks/         ← Guías operativas y playbooks de uso
 ├── changes/          ← Log de cambios por sesión (IA + manual)
 ├── analysis/         ← Auditorías, análisis de sistema
 └── cleanup/          ← Planes de cleanup y mejoras
@@ -48,6 +49,18 @@ Las reglas en `rules/` son inmutables y deben respetarse en todo cambio:
 ---
 
 ## 🔥 Tópicos Destacados (Active)
+
+### [🤖 Claude Code por Fases](./runbooks/claude-code-por-fases.md)
+**Status**: ✅ disponible
+
+Guía operativa para usar Claude Code por fases en los tres repos productivos de NovaVision:
+
+- apertura del repo correcto;
+- relevamiento con `context-mapper`;
+- implementación con el agente del repo;
+- revisión con `contract-guardian`;
+- validación con `quality-gate`;
+- documentación y cierre.
 
 ### [🎨 Theme System Refactor - 2026-02-04](./THEME_QUICK_REFERENCE.md)
 **Status**: ✅ **COMPLETE** - Unified theme resolver para storefront + admin
