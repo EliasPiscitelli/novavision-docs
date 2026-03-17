@@ -1,0 +1,215 @@
+{
+  "name": "WF-CRM-ALERT-V2 — Lifecycle + Overdue Tasks",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crm-alert",
+        "options": {}
+      },
+      "id": "crm-alert-webhook",
+      "name": "Webhook CRM Alert",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "webhookId": "crm-alert"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "overdue-check",
+              "leftValue": "={{ $json.alert_type }}",
+              "rightValue": "overdue_tasks",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "crm-alert-switch",
+      "name": "Switch: Tipo de Alerta",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [240, 300]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ─── Overdue Tasks: formatear alerta consolidada ───\nconst items = $input.all();\nconst data = items[0].json;\nconst count = data.count || 0;\nconst tasks = data.tasks || [];\n\nlet taskLines = tasks.slice(0, 15).map((t, i) => {\n  const priority = t.priority === 'urgent' ? '🔴' : t.priority === 'high' ? '🟠' : t.priority === 'normal' ? '🔵' : '⚪';\n  const due = t.due_date ? new Date(t.due_date).toLocaleDateString('es-AR') : 'sin fecha';\n  return `${i + 1}. ${priority} ${t.title}\\n   Vencida: ${due}`;\n}).join('\\n');\n\nif (count > 15) {\n  taskLines += `\\n... y ${count - 15} más`;\n}\n\nconst message = `📋 *CRM — Tareas Vencidas*\\n\\n` +\n  `⚠️ Hay *${count}* tareas vencidas:\\n\\n` +\n  taskLines + `\\n\\n` +\n  `🔗 Revisar en CRM Dashboard`;\n\nreturn [{ json: { message, count } }];"
+      },
+      "id": "crm-alert-format-overdue",
+      "name": "Formatear Overdue",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 160]
+    },
+
+    {
+      "parameters": {
+        "jsCode": "// ─── Lifecycle Transition: formatear alerta individual ───\nconst items = $input.all();\nconst data = items[0].json;\n\nconst toStage = data.to_stage || 'unknown';\nconst emoji = toStage === 'churned' ? '🚨' : toStage === 'at_risk' ? '⚠️' : 'ℹ️';\nconst severity = toStage === 'churned' ? 'CRITICO' : toStage === 'at_risk' ? 'ALERTA' : 'INFO';\n\nconst message = `${emoji} *CRM — ${severity}*\\n\\n` +\n  `*Cuenta:* ${data.email || data.slug || data.account_id}\\n` +\n  `*Transición:* ${data.from_stage} → ${data.to_stage}\\n` +\n  `*Health Score:* ${data.health_score ?? 'N/A'}\\n` +\n  `*Motivo:* ${data.reason || 'Sin detalle'}\\n\\n` +\n  `🔗 Revisar en Customer 360`;\n\nreturn [{ json: { message, account_id: data.account_id, severity } }];"
+      },
+      "id": "crm-alert-format-lifecycle",
+      "name": "Formatear Lifecycle",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 440]
+    },
+
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO crm_activity_log (account_id, actor_type, actor_id, event_type, event_data)\nSELECT\n  '{{ $('Webhook CRM Alert').item.json.account_id }}'::uuid,\n  'n8n',\n  NULL,\n  'n8n_alert_sent',\n  jsonb_build_object(\n    'alert_type', 'lifecycle_transition',\n    'to_stage', '{{ $('Webhook CRM Alert').item.json.to_stage }}',\n    'severity', '{{ $json.severity }}'\n  )\nWHERE '{{ $('Webhook CRM Alert').item.json.account_id }}' != '';",
+        "options": {}
+      },
+      "id": "crm-alert-log-lifecycle",
+      "name": "Log Activity (Lifecycle)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [740, 520],
+      "credentials": {
+        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+      }
+    },
+
+    {
+      "parameters": {
+        "sendTo": "={{ $env.SALES_ALERT_PHONE }}",
+        "message": "={{ $json.message }}",
+        "options": {}
+      },
+      "id": "crm-alert-wa-overdue",
+      "name": "WA: Overdue Tasks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 80],
+      "notes": "POST https://graph.facebook.com/v22.0/{PHONE_ID}/messages — Template o texto libre segun config. Reemplazar con nodo WhatsApp Business Cloud si disponible.",
+      "parameters_full": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{ $env.SALES_ALERT_PHONE }}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={{ JSON.stringify({ body: $json.message }) }}" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $env.SALES_ALERT_PHONE }}",
+        "message": "={{ $json.message }}",
+        "options": {}
+      },
+      "id": "crm-alert-wa-lifecycle",
+      "name": "WA: Lifecycle Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 360],
+      "notes": "POST https://graph.facebook.com/v22.0/{PHONE_ID}/messages — Misma config que el nodo de overdue.",
+      "parameters_full": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "messaging_product", "value": "whatsapp" },
+            { "name": "to", "value": "={{ $env.SALES_ALERT_PHONE }}" },
+            { "name": "type", "value": "text" },
+            { "name": "text", "value": "={{ JSON.stringify({ body: $json.message }) }}" }
+          ]
+        },
+        "options": { "timeout": 10000 }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "crm-alert-noop",
+      "name": "NoOp (fin)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [980, 300]
+    }
+  ],
+  "connections": {
+    "Webhook CRM Alert": {
+      "main": [
+        [{ "node": "Switch: Tipo de Alerta", "type": "main", "index": 0 }]
+      ]
+    },
+    "Switch: Tipo de Alerta": {
+      "main": [
+        [{ "node": "Formatear Overdue", "type": "main", "index": 0 }],
+        [{ "node": "Formatear Lifecycle", "type": "main", "index": 0 }]
+      ]
+    },
+    "Formatear Overdue": {
+      "main": [
+        [{ "node": "WA: Overdue Tasks", "type": "main", "index": 0 }]
+      ]
+    },
+    "Formatear Lifecycle": {
+      "main": [
+        [
+          { "node": "WA: Lifecycle Alert", "type": "main", "index": 0 },
+          { "node": "Log Activity (Lifecycle)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "WA: Overdue Tasks": {
+      "main": [
+        [{ "node": "NoOp (fin)", "type": "main", "index": 0 }]
+      ]
+    },
+    "WA: Lifecycle Alert": {
+      "main": [
+        [{ "node": "NoOp (fin)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log Activity (Lifecycle)": {
+      "main": [
+        [{ "node": "NoOp (fin)", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "CRM" },
+    { "name": "alerts" },
+    { "name": "production" }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": ""
+  },
+  "pinData": {},
+  "versionId": "crm-alert-v2-001"
+}
