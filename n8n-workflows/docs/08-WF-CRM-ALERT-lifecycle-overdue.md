@@ -3,7 +3,9 @@
 **Version:** v2.001
 **Trigger:** Webhook POST `/webhook/crm-alert`
 **Origen:** NestJS `crm-health.cron.ts` (fire-and-forget)
-**Estado:** Pendiente importar en n8n (reemplaza WF-CRM-ALERT-V1)
+**Estado:** ACTIVO en produccion (reemplazo WF-CRM-ALERT-V1 el 2026-03-17)
+**n8n ID:** `crm_alert_v2_001`
+**Webhook URL:** `https://n8n-production-c19d.up.railway.app/webhook/crm-alert`
 **Archivo:** `wf-crm-alert-v2.json`
 
 ---
@@ -84,7 +86,7 @@ Webhook POST /crm-alert
 
 | Credencial | ID | Tipo | Uso |
 |-----------|-----|------|-----|
-| Admin DB | `ADMIN_DB_CREDENTIAL_ID` | Postgres | Log de actividad (reemplazar con ID real) |
+| Admin DB | `dMEly2JOB3W86tWW` | Postgres | Log de actividad |
 
 ## Cambios vs V1
 
@@ -95,11 +97,11 @@ Webhook POST /crm-alert
 | Activity log | No registraba | INSERT en `crm_activity_log` para lifecycle |
 | Formato overdue | No existia | Lista con emojis de prioridad, max 15 items |
 
-## Setup
+## Setup (completado 2026-03-17)
 
-1. Importar `wf-crm-alert-v2.json` en n8n
-2. Configurar credencial Postgres (Admin DB) con el ID real
-3. Configurar `SALES_ALERT_PHONE` en variables de entorno de n8n
-4. Activar el workflow
-5. Desactivar WF-CRM-ALERT-V1 (id: `AyXOMejRIf5cTrp4`)
-6. Verificar con un POST manual al webhook
+1. ~~Importar `wf-crm-alert-v2.json` en n8n~~ DONE
+2. ~~Configurar credencial Postgres (Admin DB) — ID: `dMEly2JOB3W86tWW`~~ DONE
+3. ~~`SALES_ALERT_PHONE` ya configurado en env vars de n8n~~ DONE
+4. ~~Activar el workflow~~ DONE (via CLI + redeploy)
+5. ~~Desactivar WF-CRM-ALERT-V1 (id: `AyXOMejRIf5cTrp4`)~~ DONE
+6. Verificar con un POST manual al webhook — PENDIENTE

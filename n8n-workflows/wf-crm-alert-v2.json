@@ -1,5 +1,6 @@
 {
   "name": "WF-CRM-ALERT-V2 — Lifecycle + Overdue Tasks",
+  "id": "crm_alert_v2_001",
   "nodes": [
     {
       "parameters": {
@@ -21,7 +22,7 @@
           "conditions": [
             {
               "id": "overdue-check",
-              "leftValue": "={{ $json.alert_type }}",
+              "leftValue": "={{ $json.body ? $json.body.alert_type : $json.alert_type }}",
               "rightValue": "overdue_tasks",
               "operator": { "type": "string", "operation": "equals" }
             }
@@ -35,10 +36,9 @@
       "typeVersion": 2.1,
       "position": [240, 300]
     },
-
     {
       "parameters": {
-        "jsCode": "// ─── Overdue Tasks: formatear alerta consolidada ───\nconst items = $input.all();\nconst data = items[0].json;\nconst count = data.count || 0;\nconst tasks = data.tasks || [];\n\nlet taskLines = tasks.slice(0, 15).map((t, i) => {\n  const priority = t.priority === 'urgent' ? '🔴' : t.priority === 'high' ? '🟠' : t.priority === 'normal' ? '🔵' : '⚪';\n  const due = t.due_date ? new Date(t.due_date).toLocaleDateString('es-AR') : 'sin fecha';\n  return `${i + 1}. ${priority} ${t.title}\\n   Vencida: ${due}`;\n}).join('\\n');\n\nif (count > 15) {\n  taskLines += `\\n... y ${count - 15} más`;\n}\n\nconst message = `📋 *CRM — Tareas Vencidas*\\n\\n` +\n  `⚠️ Hay *${count}* tareas vencidas:\\n\\n` +\n  taskLines + `\\n\\n` +\n  `🔗 Revisar en CRM Dashboard`;\n\nreturn [{ json: { message, count } }];"
+        "jsCode": "const raw = $input.first().json;\nconst data = raw.body || raw;\nconst count = data.count || 0;\nconst tasks = data.tasks || [];\n\nlet taskLines = tasks.slice(0, 15).map((t, i) => {\n  const priority = t.priority === 'urgent' ? '🔴' : t.priority === 'high' ? '🟠' : t.priority === 'normal' ? '🔵' : '⚪';\n  const due = t.due_date ? new Date(t.due_date).toLocaleDateString('es-AR') : 'sin fecha';\n  return `${i + 1}. ${priority} ${t.title}\\n   Vencida: ${due}`;\n}).join('\\n');\n\nif (count > 15) {\n  taskLines += `\\n... y ${count - 15} más`;\n}\n\nconst message = `📋 *CRM — Tareas Vencidas*\\n\\n` +\n  `⚠️ Hay *${count}* tareas vencidas:\\n\\n` +\n  taskLines + `\\n\\n` +\n  `🔗 Revisar en CRM Dashboard`;\n\nreturn [{ json: { message, count } }];"
       },
       "id": "crm-alert-format-overdue",
       "name": "Formatear Overdue",
@@ -46,10 +46,9 @@
       "typeVersion": 2,
       "position": [500, 160]
     },
-
     {
       "parameters": {
-        "jsCode": "// ─── Lifecycle Transition: formatear alerta individual ───\nconst items = $input.all();\nconst data = items[0].json;\n\nconst toStage = data.to_stage || 'unknown';\nconst emoji = toStage === 'churned' ? '🚨' : toStage === 'at_risk' ? '⚠️' : 'ℹ️';\nconst severity = toStage === 'churned' ? 'CRITICO' : toStage === 'at_risk' ? 'ALERTA' : 'INFO';\n\nconst message = `${emoji} *CRM — ${severity}*\\n\\n` +\n  `*Cuenta:* ${data.email || data.slug || data.account_id}\\n` +\n  `*Transición:* ${data.from_stage} → ${data.to_stage}\\n` +\n  `*Health Score:* ${data.health_score ?? 'N/A'}\\n` +\n  `*Motivo:* ${data.reason || 'Sin detalle'}\\n\\n` +\n  `🔗 Revisar en Customer 360`;\n\nreturn [{ json: { message, account_id: data.account_id, severity } }];"
+        "jsCode": "const raw = $input.first().json;\nconst data = raw.body || raw;\n\nconst toStage = data.to_stage || 'unknown';\nconst emoji = toStage === 'churned' ? '🚨' : toStage === 'at_risk' ? '⚠️' : 'ℹ️';\nconst severity = toStage === 'churned' ? 'CRITICO' : toStage === 'at_risk' ? 'ALERTA' : 'INFO';\n\nconst message = `${emoji} *CRM — ${severity}*\\n\\n` +\n  `*Cuenta:* ${data.email || data.slug || data.account_id}\\n` +\n  `*Transición:* ${data.from_stage} → ${data.to_stage}\\n` +\n  `*Health Score:* ${data.health_score ?? 'N/A'}\\n` +\n  `*Motivo:* ${data.reason || 'Sin detalle'}\\n\\n` +\n  `🔗 Revisar en Customer 360`;\n\nreturn [{ json: { message, account_id: data.account_id, severity } }];"
       },
       "id": "crm-alert-format-lifecycle",
       "name": "Formatear Lifecycle",
@@ -57,11 +56,10 @@
       "typeVersion": 2,
       "position": [500, 440]
     },
-
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO crm_activity_log (account_id, actor_type, actor_id, event_type, event_data)\nSELECT\n  '{{ $('Webhook CRM Alert').item.json.account_id }}'::uuid,\n  'n8n',\n  NULL,\n  'n8n_alert_sent',\n  jsonb_build_object(\n    'alert_type', 'lifecycle_transition',\n    'to_stage', '{{ $('Webhook CRM Alert').item.json.to_stage }}',\n    'severity', '{{ $json.severity }}'\n  )\nWHERE '{{ $('Webhook CRM Alert').item.json.account_id }}' != '';",
+        "query": "INSERT INTO crm_activity_log (account_id, actor_type, actor_id, event_type, event_data)\nSELECT\n  '{{ $('Webhook CRM Alert').item.json.body ? $('Webhook CRM Alert').item.json.body.account_id : $('Webhook CRM Alert').item.json.account_id }}'::uuid,\n  'n8n',\n  NULL,\n  'n8n_alert_sent',\n  jsonb_build_object(\n    'alert_type', 'lifecycle_transition',\n    'to_stage', '{{ $('Webhook CRM Alert').item.json.body ? $('Webhook CRM Alert').item.json.body.to_stage : $('Webhook CRM Alert').item.json.to_stage }}',\n    'severity', '{{ $json.severity }}'\n  )\nWHERE '{{ $('Webhook CRM Alert').item.json.body ? $('Webhook CRM Alert').item.json.body.account_id : $('Webhook CRM Alert').item.json.account_id }}' != '';",
         "options": {}
       },
       "id": "crm-alert-log-lifecycle",
@@ -70,79 +68,52 @@
       "typeVersion": 2.5,
       "position": [740, 520],
       "credentials": {
-        "postgres": { "id": "ADMIN_DB_CREDENTIAL_ID", "name": "Admin DB" }
+        "postgres": { "id": "dMEly2JOB3W86tWW", "name": "Admin DB" }
       }
     },
-
     {
       "parameters": {
-        "sendTo": "={{ $env.SALES_ALERT_PHONE }}",
-        "message": "={{ $json.message }}",
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $env.SALES_ALERT_PHONE }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": {{ JSON.stringify($json.message) }} }\n}",
         "options": {}
       },
       "id": "crm-alert-wa-overdue",
       "name": "WA: Overdue Tasks",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [740, 80],
-      "notes": "POST https://graph.facebook.com/v22.0/{PHONE_ID}/messages — Template o texto libre segun config. Reemplazar con nodo WhatsApp Business Cloud si disponible.",
-      "parameters_full": {
-        "method": "POST",
-        "url": "=https://graph.facebook.com/v22.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" }
-          ]
-        },
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            { "name": "messaging_product", "value": "whatsapp" },
-            { "name": "to", "value": "={{ $env.SALES_ALERT_PHONE }}" },
-            { "name": "type", "value": "text" },
-            { "name": "text", "value": "={{ JSON.stringify({ body: $json.message }) }}" }
-          ]
-        },
-        "options": { "timeout": 10000 }
-      }
+      "position": [740, 80]
     },
     {
       "parameters": {
-        "sendTo": "={{ $env.SALES_ALERT_PHONE }}",
-        "message": "={{ $json.message }}",
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $env.SALES_ALERT_PHONE }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": {{ JSON.stringify($json.message) }} }\n}",
         "options": {}
       },
       "id": "crm-alert-wa-lifecycle",
       "name": "WA: Lifecycle Alert",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [740, 360],
-      "notes": "POST https://graph.facebook.com/v22.0/{PHONE_ID}/messages — Misma config que el nodo de overdue.",
-      "parameters_full": {
-        "method": "POST",
-        "url": "=https://graph.facebook.com/v22.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" }
-          ]
-        },
-        "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            { "name": "messaging_product", "value": "whatsapp" },
-            { "name": "to", "value": "={{ $env.SALES_ALERT_PHONE }}" },
-            { "name": "type", "value": "text" },
-            { "name": "text", "value": "={{ JSON.stringify({ body: $json.message }) }}" }
-          ]
-        },
-        "options": { "timeout": 10000 }
-      }
+      "position": [740, 360]
     },
     {
       "parameters": {},
