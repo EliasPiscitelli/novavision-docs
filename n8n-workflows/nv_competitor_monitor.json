@@ -1,0 +1,360 @@
+[
+  {
+    "name": "NV Competitor Monitor",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 10 * * 1,4"
+              }
+            ]
+          }
+        },
+        "id": "schedule-1",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          200,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "return [\n  {\n    json: {\n      name: 'Tiendanube',\n      search_terms: 'tiendanube'\n    }\n  },\n  {\n    json: {\n      name: 'MercadoShops',\n      search_terms: 'mercadoshops'\n    }\n  },\n  {\n    json: {\n      name: 'Shopify AR',\n      search_terms: 'shopify argentina'\n    }\n  }\n];"
+        },
+        "id": "code-competitors-1",
+        "name": "Define Competitors",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          420,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "id": "split-competitors-1",
+        "name": "Each Competitor",
+        "type": "n8n-nodes-base.splitInBatches",
+        "typeVersion": 3,
+        "position": [
+          640,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "method": "GET",
+          "url": "https://graph.facebook.com/v25.0/ads_archive",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "search_terms",
+                "value": "={{ $json.search_terms }}"
+              },
+              {
+                "name": "ad_reached_countries",
+                "value": "['AR']"
+              },
+              {
+                "name": "ad_active_status",
+                "value": "ACTIVE"
+              },
+              {
+                "name": "fields",
+                "value": "id,ad_creation_time,ad_creative_body,ad_creative_link_title,page_name"
+              },
+              {
+                "name": "limit",
+                "value": "50"
+              },
+              {
+                "name": "access_token",
+                "value": "={{ $env.META_ACCESS_TOKEN }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "http-ads-library-1",
+        "name": "Meta Ads Library",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          860,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const data = $input.first().json.data || [];\nconst competitorName = $('Each Competitor').item.json.name;\n\nconst sevenDaysAgo = new Date();\nsevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);\n\nconst newAds = data.filter(ad => {\n  if (!ad.ad_creation_time) return false;\n  const createdAt = new Date(ad.ad_creation_time);\n  return createdAt >= sevenDaysAgo;\n});\n\nreturn [{\n  json: {\n    competitor: competitorName,\n    total_active: data.length,\n    new_ads_count: newAds.length,\n    new_ads: newAds.map(ad => ({\n      id: ad.id,\n      page_name: ad.page_name,\n      title: ad.ad_creative_link_title || '',\n      body: (ad.ad_creative_body || '').substring(0, 200),\n      created: ad.ad_creation_time\n    })),\n    has_new_ads: newAds.length > 0\n  }\n}];"
+        },
+        "id": "code-filter-new-1",
+        "name": "Filter New Ads",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1080,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "cond-has-new-ads",
+                "leftValue": "={{ $json.has_new_ads }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals",
+                  "name": "filter.operator.equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "if-has-new-ads-1",
+        "name": "Has New Ads",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          1300,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.openai.com/v1/chat/completions",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $env.OPENAI_API_KEY }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Sos un analista de marketing digital especializado en e-commerce en Argentina. Analizas ads de competidores y das insights accionables en espanol.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Analiza estos ads nuevos del competidor {{ $json.competitor }} ({{ $json.new_ads_count }} ads nuevos en los ultimos 7 dias, {{ $json.total_active }} activos total):\\n\\n{{ JSON.stringify($json.new_ads, null, 2) }}\\n\\nDame: 1) Principales mensajes/ofertas 2) Tono y estilo 3) CTAs usados 4) Oportunidades para NovaVision. Responde en maximo 300 palabras.\"\n    }\n  ],\n  \"max_tokens\": 500,\n  \"temperature\": 0.3\n}",
+          "options": {}
+        },
+        "id": "http-openai-analysis-1",
+        "name": "OpenAI Analysis",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1520,
+          200
+        ]
+      },
+      {
+        "parameters": {},
+        "id": "noop-no-new-ads-1",
+        "name": "No New Ads",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          1520,
+          420
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const items = $input.all();\nlet report = '\\ud83d\\udd0d *Reporte de Competencia*\\n';\nreport += `Fecha: ${new Date().toLocaleDateString('es-AR')}\\n\\n`;\n\nfor (const item of items) {\n  const data = item.json;\n  \n  if (data.competitor) {\n    report += `\\n--- ${data.competitor} ---\\n`;\n    report += `Ads activos: ${data.total_active || 0}\\n`;\n    report += `Nuevos (7d): ${data.new_ads_count || 0}\\n`;\n  }\n  \n  if (data.choices && data.choices[0]) {\n    report += `\\nAnalisis:\\n${data.choices[0].message.content}\\n`;\n  }\n}\n\nreport += '\\n\\n--- Fin del reporte ---';\n\nreturn [{ json: { report } }];"
+        },
+        "id": "code-aggregate-1",
+        "name": "Aggregate Results",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1740,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.facebook.com/v25.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $env.FOUNDER_PHONE }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"{{ $json.report }}\"\n  }\n}",
+          "options": {}
+        },
+        "id": "http-whatsapp-report-1",
+        "name": "WhatsApp Report",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1960,
+          300
+        ]
+      }
+    ],
+    "connections": {
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "Define Competitors",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Define Competitors": {
+        "main": [
+          [
+            {
+              "node": "Each Competitor",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Each Competitor": {
+        "main": [
+          [
+            {
+              "node": "Meta Ads Library",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Meta Ads Library": {
+        "main": [
+          [
+            {
+              "node": "Filter New Ads",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter New Ads": {
+        "main": [
+          [
+            {
+              "node": "Has New Ads",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has New Ads": {
+        "main": [
+          [
+            {
+              "node": "OpenAI Analysis",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "No New Ads",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "OpenAI Analysis": {
+        "main": [
+          [
+            {
+              "node": "Aggregate Results",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "No New Ads": {
+        "main": [
+          [
+            {
+              "node": "Aggregate Results",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Aggregate Results": {
+        "main": [
+          [
+            {
+              "node": "WhatsApp Report",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "active": false,
+    "settings": {
+      "executionOrder": "v1",
+      "timezone": "America/Argentina/Buenos_Aires"
+    },
+    "versionId": "1",
+    "meta": {
+      "instanceId": "novavision-web"
+    },
+    "tags": [
+      {
+        "name": "competitor"
+      },
+      {
+        "name": "intelligence"
+      },
+      {
+        "name": "novavision"
+      }
+    ],
+    "id": "qrIgZhKcSn0c7k7B",
+    "staticData": null,
+    "pinData": {}
+  }
+]

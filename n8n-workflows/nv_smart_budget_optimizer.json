@@ -1,0 +1,390 @@
+[
+  {
+    "name": "NV Smart Budget Optimizer",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "triggerAtHour": 9
+              },
+              {
+                "triggerAtHour": 17
+              }
+            ]
+          }
+        },
+        "id": "schedule-1",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          200,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "method": "GET",
+          "url": "=https://graph.facebook.com/v25.0/act_{{ $env.META_AD_ACCOUNT_ID }}/insights",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "level",
+                "value": "ad"
+              },
+              {
+                "name": "fields",
+                "value": "ad_id,ad_name,adset_id,adset_name,spend,impressions,clicks,conversions,cost_per_action_type,frequency,actions"
+              },
+              {
+                "name": "date_preset",
+                "value": "last_3d"
+              },
+              {
+                "name": "limit",
+                "value": "200"
+              },
+              {
+                "name": "access_token",
+                "value": "={{ $env.META_ACCESS_TOKEN }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "http-insights-1",
+        "name": "Get Meta Ad Insights",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          420,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const insights = $input.first().json.data || [];\nconst MONTHLY_BUDGET = 500;\nconst actions = [];\n\nlet totalMonthlySpend = 0;\n\nfor (const ad of insights) {\n  const spend = parseFloat(ad.spend || 0);\n  const frequency = parseFloat(ad.frequency || 0);\n  totalMonthlySpend += spend;\n\n  let conversions = 0;\n  if (ad.actions) {\n    const convAction = ad.actions.find(a => a.action_type === 'offsite_conversion.fb_pixel_purchase' || a.action_type === 'purchase');\n    if (convAction) conversions = parseInt(convAction.value || 0);\n  }\n\n  const cpa = conversions > 0 ? spend / conversions : null;\n\n  // RULE_PAUSE_ZERO_CONVERSION: spend > 15 AND conversions == 0\n  if (spend > 15 && conversions === 0) {\n    actions.push({\n      type: 'pause',\n      ad_id: ad.ad_id,\n      ad_name: ad.ad_name,\n      adset_id: ad.adset_id,\n      details: { spend, conversions },\n      message: `Ad \"${ad.ad_name}\" gast\u00f3 $${spend.toFixed(2)} sin conversiones. Pausando.`\n    });\n    continue;\n  }\n\n  // RULE_SCALE_WINNER: CPA < 20 AND conversions >= 3\n  if (cpa !== null && cpa < 20 && conversions >= 3) {\n    actions.push({\n      type: 'scale',\n      ad_id: ad.ad_id,\n      ad_name: ad.ad_name,\n      adset_id: ad.adset_id,\n      details: { spend, conversions, cpa: cpa.toFixed(2) },\n      message: `Ad \"${ad.ad_name}\" es ganador (CPA $${cpa.toFixed(2)}, ${conversions} conv). Escalando budget +20%.`\n    });\n    continue;\n  }\n\n  // RULE_HIGH_FREQUENCY: frequency > 2.5\n  if (frequency > 2.5) {\n    actions.push({\n      type: 'alert',\n      ad_id: ad.ad_id,\n      ad_name: ad.ad_name,\n      adset_id: ad.adset_id,\n      details: { frequency },\n      message: `Ad \"${ad.ad_name}\" tiene frecuencia alta (${frequency.toFixed(1)}). Revisar creativos.`\n    });\n  }\n}\n\n// RULE_BUDGET_BURNDOWN: monthly spend > 85% budget\nif (totalMonthlySpend > MONTHLY_BUDGET * 0.85) {\n  actions.push({\n    type: 'alert',\n    ad_id: 'account_level',\n    ad_name: 'Budget Burndown',\n    adset_id: '',\n    details: { totalMonthlySpend, budget: MONTHLY_BUDGET, pct: ((totalMonthlySpend / MONTHLY_BUDGET) * 100).toFixed(1) },\n    message: `Gasto mensual ($${totalMonthlySpend.toFixed(2)}) supera 85% del budget ($${MONTHLY_BUDGET}). Revisar.`\n  });\n}\n\nreturn [{ json: { actions, hasActions: actions.length > 0 } }];"
+        },
+        "id": "code-rules-1",
+        "name": "Apply Rules",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          640,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "cond-has-actions",
+                "leftValue": "={{ $json.hasActions }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals",
+                  "name": "filter.operator.equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "if-has-actions-1",
+        "name": "Has Actions",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          860,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "id": "split-actions-1",
+        "name": "Process Actions",
+        "type": "n8n-nodes-base.splitInBatches",
+        "typeVersion": 3,
+        "position": [
+          1080,
+          200
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "cond-is-pause",
+                "leftValue": "={{ $json.type }}",
+                "rightValue": "pause",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals",
+                  "name": "filter.operator.equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "if-is-pause-1",
+        "name": "Is Pause",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          1300,
+          200
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.facebook.com/v25.0/{{ $json.ad_id }}",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"status\": \"PAUSED\",\n  \"access_token\": \"{{ $env.META_ACCESS_TOKEN }}\"\n}",
+          "options": {}
+        },
+        "id": "http-pause-ad-1",
+        "name": "Pause Ad",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1520,
+          100
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.facebook.com/v25.0/{{ $json.adset_id }}",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"daily_budget\": \"{{ Math.round(parseFloat($json.details.spend || 0) * 1.2 * 100) }}\",\n  \"access_token\": \"{{ $env.META_ACCESS_TOKEN }}\"\n}",
+          "options": {}
+        },
+        "id": "http-scale-budget-1",
+        "name": "Scale Budget",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1520,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const items = $input.all();\nconst allActions = items.map(i => i.json);\n\nlet summary = '\\ud83d\\udcca *Budget Optimizer Report*\\n\\n';\nlet pauseCount = 0;\nlet scaleCount = 0;\nlet alertCount = 0;\n\nfor (const action of allActions) {\n  if (action.type === 'pause') { pauseCount++; summary += `\\u23f8 ${action.message}\\n`; }\n  else if (action.type === 'scale') { scaleCount++; summary += `\\ud83d\\ude80 ${action.message}\\n`; }\n  else if (action.type === 'alert') { alertCount++; summary += `\\u26a0\\ufe0f ${action.message}\\n`; }\n}\n\nsummary += `\\n*Resumen:* ${pauseCount} pausados, ${scaleCount} escalados, ${alertCount} alertas`;\n\nreturn [{ json: { summary } }];"
+        },
+        "id": "code-build-notification-1",
+        "name": "Build Notification",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1740,
+          200
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.facebook.com/v25.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $env.FOUNDER_PHONE }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"{{ $json.summary }}\"\n  }\n}",
+          "options": {}
+        },
+        "id": "http-whatsapp-summary-1",
+        "name": "WhatsApp Summary",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1960,
+          200
+        ]
+      },
+      {
+        "parameters": {},
+        "id": "noop-1",
+        "name": "No Actions",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          1080,
+          420
+        ]
+      }
+    ],
+    "connections": {
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "Get Meta Ad Insights",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Meta Ad Insights": {
+        "main": [
+          [
+            {
+              "node": "Apply Rules",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Apply Rules": {
+        "main": [
+          [
+            {
+              "node": "Has Actions",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Actions": {
+        "main": [
+          [
+            {
+              "node": "Process Actions",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "No Actions",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Process Actions": {
+        "main": [
+          [
+            {
+              "node": "Is Pause",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is Pause": {
+        "main": [
+          [
+            {
+              "node": "Pause Ad",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Scale Budget",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Pause Ad": {
+        "main": [
+          [
+            {
+              "node": "Build Notification",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Scale Budget": {
+        "main": [
+          [
+            {
+              "node": "Build Notification",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build Notification": {
+        "main": [
+          [
+            {
+              "node": "WhatsApp Summary",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "active": false,
+    "settings": {
+      "executionOrder": "v1",
+      "timezone": "America/Argentina/Buenos_Aires"
+    },
+    "versionId": "1",
+    "meta": {
+      "instanceId": "novavision-web"
+    },
+    "tags": [
+      {
+        "name": "budget"
+      },
+      {
+        "name": "meta"
+      },
+      {
+        "name": "novavision"
+      }
+    ],
+    "id": "T9qCzBPZNv75bls1",
+    "staticData": null,
+    "pinData": {}
+  }
+]

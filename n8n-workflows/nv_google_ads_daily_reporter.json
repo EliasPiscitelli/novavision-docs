@@ -1,0 +1,151 @@
+[
+  {
+    "name": "NV Google Ads Daily Reporter",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "triggerAtHour": 8,
+                "triggerAtMinute": 30
+              }
+            ]
+          }
+        },
+        "id": "gdr-sched-0001",
+        "name": "Daily 8:30AM ART",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [0, 0]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://googleads.googleapis.com/v17/customers/{{ $env.GOOGLE_ADS_CUSTOMER_ID }}/googleAds:searchStream",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              { "name": "Authorization", "value": "=Bearer {{ $env.GOOGLE_ADS_ACCESS_TOKEN }}" },
+              { "name": "developer-token", "value": "={{ $env.GOOGLE_ADS_DEVELOPER_TOKEN }}" },
+              { "name": "login-customer-id", "value": "={{ $env.GOOGLE_ADS_CUSTOMER_ID }}" },
+              { "name": "Content-Type", "value": "application/json" }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"query\": \"SELECT campaign.name, campaign.status, campaign.id, metrics.cost_micros, metrics.clicks, metrics.impressions, metrics.conversions, metrics.cost_per_conversion FROM campaign WHERE segments.date = '{{ $now.minus({days:1}).toFormat('yyyy-MM-dd') }}' AND campaign.status = 'ENABLED'\"\n}",
+          "options": { "response": { "response": { "responseFormat": "json" } } }
+        },
+        "id": "gdr-http-gads-0002",
+        "name": "GET Google Ads Campaigns",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [260, 0]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "={{ $env.SUPABASE_URL }}/rest/v1/rpc/get_daily_funnel_metrics",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              { "name": "apikey", "value": "={{ $env.SUPABASE_SERVICE_ROLE }}" },
+              { "name": "Authorization", "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE }}" },
+              { "name": "Content-Type", "value": "application/json" }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"p_date\": \"{{ $now.minus({days:1}).toFormat('yyyy-MM-dd') }}\"\n}",
+          "options": { "response": { "response": { "responseFormat": "json" } } }
+        },
+        "id": "gdr-http-supa-0003",
+        "name": "GET Supabase Funnel",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [520, 0]
+      },
+      {
+        "parameters": {
+          "jsCode": "const gadsRaw = $('GET Google Ads Campaigns').all();\nconst funnel = $('GET Supabase Funnel').first().json;\n\nconst rows = [];\nfor (const item of gadsRaw) {\n  const batches = Array.isArray(item.json) ? item.json : [item.json];\n  for (const batch of batches) {\n    if (batch.results) rows.push(...batch.results);\n  }\n}\n\nconst totals = rows.reduce((acc, row) => {\n  const m = row.metrics || {};\n  acc.costMicros += parseInt(m.costMicros || 0);\n  acc.clicks += parseInt(m.clicks || 0);\n  acc.impressions += parseInt(m.impressions || 0);\n  acc.conversions += parseFloat(m.conversions || 0);\n  return acc;\n}, { costMicros: 0, clicks: 0, impressions: 0, conversions: 0 });\n\ntotals.spend = (totals.costMicros / 1000000).toFixed(2);\ntotals.cpc = totals.clicks > 0 ? (totals.costMicros / 1000000 / totals.clicks).toFixed(2) : 'N/A';\ntotals.cpl = totals.conversions > 0 ? (totals.costMicros / 1000000 / totals.conversions).toFixed(2) : 'N/A';\n\nconst sorted = [...rows].sort((a, b) => parseFloat(b.metrics?.conversions || 0) - parseFloat(a.metrics?.conversions || 0));\nconst topCampaign = sorted[0];\n\nconst alertCampaigns = rows.filter(row => {\n  const spend = parseInt(row.metrics?.costMicros || 0) / 1000000;\n  return spend > 20 && parseFloat(row.metrics?.conversions || 0) === 0;\n}).map(row => ({ name: row.campaign?.name, spend: (parseInt(row.metrics?.costMicros || 0) / 1000000).toFixed(2) }));\n\nconst campaigns = rows.map(row => ({\n  name: row.campaign?.name || 'Unknown',\n  spend: (parseInt(row.metrics?.costMicros || 0) / 1000000).toFixed(2),\n  clicks: parseInt(row.metrics?.clicks || 0),\n  conversions: parseFloat(row.metrics?.conversions || 0)\n}));\n\nreturn [{ json: {\n  date: $now.minus({ days: 1 }).toFormat('dd/MM/yyyy'),\n  totals, campaigns, alertCampaigns,\n  topCampaign: topCampaign ? { name: topCampaign.campaign?.name, conversions: parseFloat(topCampaign.metrics?.conversions || 0), spend: (parseInt(topCampaign.metrics?.costMicros || 0) / 1000000).toFixed(2) } : null,\n  funnel: funnel || {}\n}}];"
+        },
+        "id": "gdr-code-fmt-0004",
+        "name": "Format Metrics",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [780, 0]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.openai.com/v1/chat/completions",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              { "name": "Authorization", "value": "=Bearer {{ $env.OPENAI_API_KEY }}" },
+              { "name": "Content-Type", "value": "application/json" }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"max_tokens\": 400,\n  \"messages\": [\n    { \"role\": \"system\", \"content\": \"Sos analista de Google Ads para NovaVision, plataforma SaaS B2B de tiendas online para pymes argentinas. Analiza metricas diarias: 1) Insight clave, 2) Campana top, 3) Una accion para manana. Max 150 palabras. Espanol. Tono directo.\" },\n    { \"role\": \"user\", \"content\": \"Reporte Google Ads {{ $json.date }}:\\nSpend: USD {{ $json.totals.spend }}\\nClicks: {{ $json.totals.clicks }}\\nImpressions: {{ $json.totals.impressions }}\\nConversions: {{ $json.totals.conversions }}\\nCPC: USD {{ $json.totals.cpc }}\\nCPL: USD {{ $json.totals.cpl }}\\nTop: {{ $json.topCampaign ? $json.topCampaign.name : 'N/A' }}\\nAlertas (spend>20 sin conv): {{ $json.alertCampaigns.length }}\\nFunnel: {{ JSON.stringify($json.funnel) }}\" }\n  ]\n}",
+          "options": { "response": { "response": { "responseFormat": "json" } } }
+        },
+        "id": "gdr-http-oai-0005",
+        "name": "OpenAI Analysis",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [1040, 0]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.facebook.com/v25.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" },
+              { "name": "Content-Type", "value": "application/json" }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $env.FOUNDER_PHONE }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": {{ JSON.stringify('Google Ads ' + $('Format Metrics').first().json.date + '\\n\\nSpend: USD ' + $('Format Metrics').first().json.totals.spend + ' | Clicks: ' + $('Format Metrics').first().json.totals.clicks + ' | Conv: ' + $('Format Metrics').first().json.totals.conversions + '\\nCPC: USD ' + $('Format Metrics').first().json.totals.cpc + ' | CPL: USD ' + $('Format Metrics').first().json.totals.cpl + '\\n\\nIA: ' + $json.choices[0].message.content) }} }\n}",
+          "options": { "response": { "response": { "responseFormat": "json" } } }
+        },
+        "id": "gdr-http-wa-0006",
+        "name": "Send WhatsApp",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [1300, 0]
+      },
+      {
+        "parameters": {
+          "jsCode": "const data = $('Format Metrics').first().json;\nconst alerts = data.alertCampaigns || [];\nif (alerts.length === 0) return [];\nreturn alerts.map(c => ({ json: { type: 'alert', name: c.name, spend: c.spend, message: 'ALERTA: ' + c.name + ' gasto USD ' + c.spend + ' con 0 conversiones. Revisar manualmente.' } }));"
+        },
+        "id": "gdr-code-alert-0007",
+        "name": "Alert Check",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [1560, 0]
+      }
+    ],
+    "connections": {
+      "Daily 8:30AM ART": { "main": [[{ "node": "GET Google Ads Campaigns", "type": "main", "index": 0 }]] },
+      "GET Google Ads Campaigns": { "main": [[{ "node": "GET Supabase Funnel", "type": "main", "index": 0 }]] },
+      "GET Supabase Funnel": { "main": [[{ "node": "Format Metrics", "type": "main", "index": 0 }]] },
+      "Format Metrics": { "main": [[{ "node": "OpenAI Analysis", "type": "main", "index": 0 }]] },
+      "OpenAI Analysis": { "main": [[{ "node": "Send WhatsApp", "type": "main", "index": 0 }]] },
+      "Send WhatsApp": { "main": [[{ "node": "Alert Check", "type": "main", "index": 0 }]] }
+    },
+    "active": false,
+    "settings": { "executionOrder": "v1", "timezone": "America/Argentina/Buenos_Aires" },
+    "versionId": "1",
+    "meta": { "instanceId": "nv-google-ads-daily-reporter-v1" },
+    "tags": [{ "name": "google-ads" }, { "name": "daily-report" }, { "name": "novavision" }],
+    "id": "gR7kM3pX9nQwJ2vL",
+    "staticData": null,
+    "pinData": {}
+  }
+]

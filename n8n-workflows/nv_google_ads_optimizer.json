@@ -1,0 +1,124 @@
+[
+  {
+    "name": "NV Google Ads Optimizer",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              { "triggerAtHour": 9, "triggerAtMinute": 30 },
+              { "triggerAtHour": 17, "triggerAtMinute": 30 }
+            ]
+          }
+        },
+        "id": "go-sched-0001",
+        "name": "Schedule 9:30AM 5:30PM",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [200, 300]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://googleads.googleapis.com/v17/customers/{{ $env.GOOGLE_ADS_CUSTOMER_ID }}/googleAds:searchStream",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              { "name": "Authorization", "value": "=Bearer {{ $env.GOOGLE_ADS_ACCESS_TOKEN }}" },
+              { "name": "developer-token", "value": "={{ $env.GOOGLE_ADS_DEVELOPER_TOKEN }}" },
+              { "name": "login-customer-id", "value": "={{ $env.GOOGLE_ADS_CUSTOMER_ID }}" },
+              { "name": "Content-Type", "value": "application/json" }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"query\": \"SELECT campaign.name, campaign.id, campaign.status, metrics.cost_micros, metrics.clicks, metrics.impressions, metrics.conversions, metrics.cost_per_conversion, metrics.search_impression_share FROM campaign WHERE segments.date DURING LAST_7_DAYS AND campaign.status = 'ENABLED'\"\n}",
+          "options": { "response": { "response": { "responseFormat": "json" } } }
+        },
+        "id": "go-http-perf-0002",
+        "name": "GET 7-Day Performance",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [420, 300]
+      },
+      {
+        "parameters": {
+          "jsCode": "const gadsRaw = $input.first().json;\nconst alerts = [];\nconst rows = [];\nconst batches = Array.isArray(gadsRaw) ? gadsRaw : [gadsRaw];\nfor (const batch of batches) { if (batch.results) rows.push(...batch.results); }\n\nconst campaignMap = {};\nfor (const row of rows) {\n  const id = row.campaign?.id || 'unknown';\n  if (!campaignMap[id]) { campaignMap[id] = { name: row.campaign?.name || 'Unknown', id, costMicros: 0, clicks: 0, impressions: 0, conversions: 0, searchImprShare: 0, rowCount: 0 }; }\n  const m = row.metrics || {};\n  campaignMap[id].costMicros += parseInt(m.costMicros || 0);\n  campaignMap[id].clicks += parseInt(m.clicks || 0);\n  campaignMap[id].impressions += parseInt(m.impressions || 0);\n  campaignMap[id].conversions += parseFloat(m.conversions || 0);\n  campaignMap[id].searchImprShare += parseFloat(m.searchImpressionShare || 0);\n  campaignMap[id].rowCount += 1;\n}\n\nconst campaigns = Object.values(campaignMap).map(c => ({\n  ...c, spend: c.costMicros / 1000000,\n  cpa: c.conversions > 0 ? c.costMicros / 1000000 / c.conversions : null,\n  ctr: c.impressions > 0 ? c.clicks / c.impressions * 100 : 0,\n  avgImprShare: c.rowCount > 0 ? c.searchImprShare / c.rowCount : 0\n}));\n\nfor (const c of campaigns) {\n  if (c.spend > 30 && c.conversions === 0) alerts.push({ rule: 'PAUSAR', campaign: c.name, metric: `USD ${c.spend.toFixed(2)}, 0 conv`, rec: `\"${c.name}\" gasto USD ${c.spend.toFixed(2)} en 7 dias sin conversiones. Considerar pausar.` });\n  if (c.cpa !== null && c.cpa < 15 && c.conversions >= 5) alerts.push({ rule: 'ESCALAR', campaign: c.name, metric: `CPA USD ${c.cpa.toFixed(2)}, ${c.conversions} conv`, rec: `\"${c.name}\" tiene CPA bajo (USD ${c.cpa.toFixed(2)}) con ${c.conversions} conversiones. Aumentar budget 15%.` });\n  if (c.avgImprShare < 0.5 && c.conversions > 0) alerts.push({ rule: 'BID', campaign: c.name, metric: `Impr Share ${(c.avgImprShare * 100).toFixed(1)}%`, rec: `\"${c.name}\" tiene impression share bajo (${(c.avgImprShare * 100).toFixed(1)}%) pero convierte. Aumentar bid.` });\n  if (c.ctr < 1 && c.impressions > 100) alerts.push({ rule: 'COPY', campaign: c.name, metric: `CTR ${c.ctr.toFixed(2)}%`, rec: `\"${c.name}\" tiene CTR bajo (${c.ctr.toFixed(2)}%). Revisar copy de anuncios.` });\n}\n\nreturn [{ json: { alerts, hasAlerts: alerts.length > 0, count: campaigns.length } }];"
+        },
+        "id": "go-code-rules-0003",
+        "name": "Apply 4 Rules",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [640, 300]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "conditions": [{ "id": "has-alerts", "leftValue": "={{ $json.hasAlerts }}", "rightValue": true, "operator": { "type": "boolean", "operation": "equals" } }],
+            "combinator": "and"
+          }
+        },
+        "id": "go-if-0004",
+        "name": "Has Alerts?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [860, 300]
+      },
+      {
+        "parameters": {
+          "jsCode": "const data = $input.first().json;\nconst alerts = data.alerts || [];\nlet msg = '*Google Ads Optimizer*\\n';\nmsg += `Campanas: ${data.count} | Alertas: ${alerts.length}\\n\\n`;\nfor (const a of alerts) { msg += `[${a.rule}] ${a.rec}\\n\\n`; }\nmsg += 'Nota: Google Ads no se modifica automaticamente. Aplicar manualmente.';\nreturn [{ json: { message: msg } }];"
+        },
+        "id": "go-code-fmt-0005",
+        "name": "Format Message",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [1080, 200]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.facebook.com/v25.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" },
+              { "name": "Content-Type", "value": "application/json" }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $env.FOUNDER_PHONE }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": {{ JSON.stringify($json.message) }} }\n}",
+          "options": { "response": { "response": { "responseFormat": "json" } } }
+        },
+        "id": "go-http-wa-0006",
+        "name": "Send WhatsApp",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [1300, 200]
+      },
+      {
+        "parameters": {},
+        "id": "go-noop-0007",
+        "name": "No Alerts",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [1080, 420]
+      }
+    ],
+    "connections": {
+      "Schedule 9:30AM 5:30PM": { "main": [[{ "node": "GET 7-Day Performance", "type": "main", "index": 0 }]] },
+      "GET 7-Day Performance": { "main": [[{ "node": "Apply 4 Rules", "type": "main", "index": 0 }]] },
+      "Apply 4 Rules": { "main": [[{ "node": "Has Alerts?", "type": "main", "index": 0 }]] },
+      "Has Alerts?": { "main": [[{ "node": "Format Message", "type": "main", "index": 0 }], [{ "node": "No Alerts", "type": "main", "index": 0 }]] },
+      "Format Message": { "main": [[{ "node": "Send WhatsApp", "type": "main", "index": 0 }]] }
+    },
+    "active": false,
+    "settings": { "executionOrder": "v1", "timezone": "America/Argentina/Buenos_Aires" },
+    "versionId": "1",
+    "meta": { "instanceId": "nv-google-ads-optimizer-v1" },
+    "tags": [{ "name": "google-ads" }, { "name": "optimizer" }, { "name": "novavision" }],
+    "id": "hN4xW8vR2mTqK6pY",
+    "staticData": null,
+    "pinData": {}
+  }
+]

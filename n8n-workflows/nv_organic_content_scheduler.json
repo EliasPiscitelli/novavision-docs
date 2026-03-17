@@ -1,0 +1,428 @@
+[
+  {
+    "name": "NV Organic Content Scheduler",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 * * * *"
+              }
+            ]
+          }
+        },
+        "id": "schedule-1",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          200,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "method": "GET",
+          "url": "={{ $env.SUPABASE_URL }}/rest/v1/content_calendar",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "apikey",
+                "value": "={{ $env.SUPABASE_SERVICE_ROLE }}"
+              },
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE }}"
+              }
+            ]
+          },
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "status",
+                "value": "eq.TO_GO"
+              },
+              {
+                "name": "scheduled_at",
+                "value": "=lte.{{ $now.toISO() }}"
+              },
+              {
+                "name": "order",
+                "value": "scheduled_at.asc"
+              },
+              {
+                "name": "limit",
+                "value": "1"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "http-check-pending-1",
+        "name": "Check Pending Posts",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          420,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "cond-has-post",
+                "leftValue": "={{ $json.length > 0 || ($json.id !== undefined) }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals",
+                  "name": "filter.operator.equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "if-has-post-1",
+        "name": "Has Post",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          640,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const post = Array.isArray($input.first().json) ? $input.first().json[0] : $input.first().json;\n\nconst platform = (post.platform || 'instagram').toLowerCase();\nconst payload = {\n  id: post.id,\n  platform: platform,\n  caption: post.caption || '',\n  media_url: post.media_url || '',\n  media_type: post.media_type || 'IMAGE',\n  hashtags: post.hashtags || '',\n  is_instagram: platform === 'instagram',\n  is_facebook: platform === 'facebook'\n};\n\nif (payload.hashtags) {\n  payload.caption = payload.caption + '\\n\\n' + payload.hashtags;\n}\n\nreturn [{ json: payload }];"
+        },
+        "id": "code-prepare-1",
+        "name": "Prepare Publish Payload",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          860,
+          200
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "cond-is-ig",
+                "leftValue": "={{ $json.is_instagram }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals",
+                  "name": "filter.operator.equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "if-platform-ig-1",
+        "name": "Platform is Instagram",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          1080,
+          200
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.facebook.com/v25.0/{{ $env.INSTAGRAM_ACCOUNT_ID }}/media",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"image_url\": \"{{ $('Prepare Publish Payload').item.json.media_url }}\",\n  \"caption\": \"{{ $('Prepare Publish Payload').item.json.caption }}\",\n  \"access_token\": \"{{ $env.META_ACCESS_TOKEN }}\"\n}",
+          "options": {}
+        },
+        "id": "http-ig-create-1",
+        "name": "IG Create Container",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1300,
+          100
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.facebook.com/v25.0/{{ $env.INSTAGRAM_ACCOUNT_ID }}/media_publish",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"creation_id\": \"{{ $json.id }}\",\n  \"access_token\": \"{{ $env.META_ACCESS_TOKEN }}\"\n}",
+          "options": {}
+        },
+        "id": "http-ig-publish-1",
+        "name": "IG Publish",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1520,
+          100
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.facebook.com/v25.0/{{ $env.META_PAGE_ID }}/feed",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"message\": \"{{ $('Prepare Publish Payload').item.json.caption }}\",\n  \"link\": \"{{ $('Prepare Publish Payload').item.json.media_url }}\",\n  \"access_token\": \"{{ $env.META_ACCESS_TOKEN }}\"\n}",
+          "options": {}
+        },
+        "id": "http-fb-publish-1",
+        "name": "Publish to Facebook",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1300,
+          320
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "={{ $env.SUPABASE_URL }}/rest/v1/content_calendar?id=eq.{{ $('Prepare Publish Payload').item.json.id }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "apikey",
+                "value": "={{ $env.SUPABASE_SERVICE_ROLE }}"
+              },
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "Prefer",
+                "value": "return=minimal"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"status\": \"POSTED\",\n  \"posted_at\": \"{{ $now.toISO() }}\"\n}",
+          "options": {}
+        },
+        "id": "http-supabase-update-1",
+        "name": "Update Supabase Status",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1740,
+          200
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.facebook.com/v25.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $env.FOUNDER_PHONE }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"\\u2705 Post publicado en {{ $('Prepare Publish Payload').item.json.platform }}.\\n\\nCaption: {{ $('Prepare Publish Payload').item.json.caption.substring(0, 100) }}...\"\n  }\n}",
+          "options": {}
+        },
+        "id": "http-whatsapp-notify-1",
+        "name": "WhatsApp Notify",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1960,
+          200
+        ]
+      },
+      {
+        "parameters": {},
+        "id": "noop-1",
+        "name": "No Pending Posts",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          860,
+          420
+        ]
+      }
+    ],
+    "connections": {
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "Check Pending Posts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check Pending Posts": {
+        "main": [
+          [
+            {
+              "node": "Has Post",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Post": {
+        "main": [
+          [
+            {
+              "node": "Prepare Publish Payload",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "No Pending Posts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare Publish Payload": {
+        "main": [
+          [
+            {
+              "node": "Platform is Instagram",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Platform is Instagram": {
+        "main": [
+          [
+            {
+              "node": "IG Create Container",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Publish to Facebook",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IG Create Container": {
+        "main": [
+          [
+            {
+              "node": "IG Publish",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IG Publish": {
+        "main": [
+          [
+            {
+              "node": "Update Supabase Status",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Publish to Facebook": {
+        "main": [
+          [
+            {
+              "node": "Update Supabase Status",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Update Supabase Status": {
+        "main": [
+          [
+            {
+              "node": "WhatsApp Notify",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "active": false,
+    "settings": {
+      "executionOrder": "v1",
+      "timezone": "America/Argentina/Buenos_Aires"
+    },
+    "versionId": "1",
+    "meta": {
+      "instanceId": "novavision-web"
+    },
+    "tags": [
+      {
+        "name": "organic"
+      },
+      {
+        "name": "content"
+      },
+      {
+        "name": "novavision"
+      }
+    ],
+    "id": "laZHCHrzDNkD5DqB",
+    "staticData": null,
+    "pinData": {}
+  }
+]

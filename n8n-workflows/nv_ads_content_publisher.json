@@ -1,0 +1,273 @@
+[
+  {
+    "name": "NV Ads Content Publisher",
+    "nodes": [
+      {
+        "parameters": {
+          "path": "publish-creative",
+          "httpMethod": "POST",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "webhook-1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          200,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const body = $input.first().json.body;\n\nif (!body.asset_id || !body.platforms || !body.hook_text || !body.body_text) {\n  throw new Error('Missing required fields: asset_id, platforms, hook_text, body_text');\n}\n\nconst platforms = Array.isArray(body.platforms) ? body.platforms : [body.platforms];\n\nreturn [{\n  json: {\n    asset_id: body.asset_id,\n    platforms: platforms,\n    hook_text: body.hook_text,\n    body_text: body.body_text,\n    cta_type: body.cta_type || 'LEARN_MORE',\n    cta_link: body.cta_link || '',\n    adset_id: body.adset_id || '',\n    image_url: body.image_url || '',\n    has_meta: platforms.includes('meta'),\n    has_tiktok: platforms.includes('tiktok')\n  }\n}];"
+        },
+        "id": "code-validate-1",
+        "name": "Validate Payload",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          420,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "cond-has-meta",
+                "leftValue": "={{ $json.has_meta }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals",
+                  "name": "filter.operator.equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "id": "if-has-meta-1",
+        "name": "Has Meta",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          640,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.facebook.com/v25.0/act_{{ $env.META_AD_ACCOUNT_ID }}/adcreatives",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"name\": \"NV Creative - {{ $json.asset_id }}\",\n  \"object_story_spec\": {\n    \"page_id\": \"{{ $env.META_PAGE_ID }}\",\n    \"link_data\": {\n      \"message\": \"{{ $json.hook_text }}\",\n      \"link\": \"{{ $json.cta_link }}\",\n      \"name\": \"{{ $json.body_text }}\",\n      \"call_to_action\": {\n        \"type\": \"{{ $json.cta_type }}\",\n        \"value\": {\n          \"link\": \"{{ $json.cta_link }}\"\n        }\n      },\n      \"picture\": \"{{ $json.image_url }}\"\n    }\n  },\n  \"access_token\": \"{{ $env.META_ACCESS_TOKEN }}\"\n}",
+          "options": {}
+        },
+        "id": "http-meta-creative-1",
+        "name": "Create Meta Ad Creative",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          860,
+          200
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.facebook.com/v25.0/act_{{ $env.META_AD_ACCOUNT_ID }}/ads",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"name\": \"NV Ad - {{ $('Validate Payload').item.json.asset_id }}\",\n  \"adset_id\": \"{{ $('Validate Payload').item.json.adset_id }}\",\n  \"creative\": { \"creative_id\": \"{{ $json.id }}\" },\n  \"status\": \"PAUSED\",\n  \"access_token\": \"{{ $env.META_ACCESS_TOKEN }}\"\n}",
+          "options": {}
+        },
+        "id": "http-meta-ad-1",
+        "name": "Create Meta Ad",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1080,
+          200
+        ]
+      },
+      {
+        "parameters": {
+          "method": "PATCH",
+          "url": "={{ $env.SUPABASE_URL }}/rest/v1/ad_assets?id=eq.{{ $('Validate Payload').item.json.asset_id }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "apikey",
+                "value": "={{ $env.SUPABASE_SERVICE_ROLE }}"
+              },
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "Prefer",
+                "value": "return=minimal"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "{\n  \"status\": \"pending_review\",\n  \"updated_at\": \"{{ $now.toISO() }}\"\n}",
+          "options": {}
+        },
+        "id": "http-supabase-update-1",
+        "name": "Update Supabase ad_assets",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1300,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.facebook.com/v25.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $env.FOUNDER_PHONE }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"\\ud83d\\udce2 Nuevo ad creado y listo para review.\\n\\nAsset ID: {{ $('Validate Payload').item.json.asset_id }}\\nHook: {{ $('Validate Payload').item.json.hook_text }}\\nPlataformas: {{ $('Validate Payload').item.json.platforms.join(', ') }}\\n\\nEstado: pending_review\"\n  }\n}",
+          "options": {}
+        },
+        "id": "http-whatsapp-notify-1",
+        "name": "WhatsApp Notify",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1520,
+          300
+        ]
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Validate Payload",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Payload": {
+        "main": [
+          [
+            {
+              "node": "Has Meta",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Has Meta": {
+        "main": [
+          [
+            {
+              "node": "Create Meta Ad Creative",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Update Supabase ad_assets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Meta Ad Creative": {
+        "main": [
+          [
+            {
+              "node": "Create Meta Ad",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Meta Ad": {
+        "main": [
+          [
+            {
+              "node": "Update Supabase ad_assets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Update Supabase ad_assets": {
+        "main": [
+          [
+            {
+              "node": "WhatsApp Notify",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "active": false,
+    "settings": {
+      "executionOrder": "v1",
+      "timezone": "America/Argentina/Buenos_Aires"
+    },
+    "versionId": "1",
+    "meta": {
+      "instanceId": "novavision-web"
+    },
+    "tags": [
+      {
+        "name": "ads"
+      },
+      {
+        "name": "meta"
+      },
+      {
+        "name": "novavision"
+      }
+    ],
+    "id": "wJeMazZWE1UeYOpX",
+    "staticData": null,
+    "pinData": {}
+  }
+]
