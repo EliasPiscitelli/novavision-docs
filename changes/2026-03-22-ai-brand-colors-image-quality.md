@@ -48,6 +48,13 @@ Las imágenes generadas por IA (banners, fotos de producto, logos) ahora respeta
 
 - Mock de `getBrandColors` agregado al mock de `StoreContextService`
 
+### Spatial Composition Guide (`prompts/index.ts` — `buildBannerPrompt`)
+
+- **Desktop (landscape)**: sujeto en tercio derecho, tercios izquierdos limpios para overlay de texto del frontend
+- **Mobile (portrait)**: sujeto en dos tercios inferiores, tercio superior limpio para headline
+- Instrucciones explícitas de regla de tercios, ángulo de cámara, dirección de mirada del sujeto
+- Fix definitivo para banners que parecían "fotos de producto" en vez de "hero sections de marketing"
+
 ### Art Direction Expansion (`prompts/index.ts`)
 
 - **Nueva función** `expandWithArtDirection(text, mode)`: detecta keywords de rubro en el prompt del usuario y enriquece automáticamente con vocabulario de dirección artística específico
