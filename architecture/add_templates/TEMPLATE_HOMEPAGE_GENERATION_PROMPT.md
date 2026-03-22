@@ -1,10 +1,10 @@
 # 🏗️ Prompt Estructural para Generar Homepages de E-Commerce — NovaVision
 
-> **Versión:** 3.0  
-> **Fecha:** 2026-02-21  
-> **Propósito:** Generar templates de homepage completos con libertad total de diseño UX/UI, pero respetando la arquitectura obligatoria del sistema.  
-> **Stack:** React JS + Tailwind CSS + CSS variables `var(--nv-*)`  
-> **Cambios v3.0:** Secciones nuevas sobre Header global, Footer obligatorio, SectionRenderer, registro de template, contextos prohibidos, lecciones aprendidas de templates 6/7/8. Template 8 (Lumina) incluido en diseños a no repetir.
+> **Versión:** 4.0
+> **Fecha:** 2026-03-19
+> **Propósito:** Generar templates de homepage con diseño UX/UI original, usando componentes unificados + un HeroSection único.
+> **Stack:** React JS + Tailwind CSS + CSS variables `var(--nv-*)`
+> **Cambios v4.0:** Post-unificación (T1-T6). Ya NO se generan componentes para FAQ, Contact, Footer, Services ni ProductCarousel. Solo se genera el HeroSection y un config.js con selección de variantes. Se usa `scripts/new-template.mjs` para scaffold.
 
 ---
 
@@ -33,36 +33,51 @@ En entornos de sandbox o preview (CodeSandbox, StackBlitz, AI playgrounds), **Ta
 
 ---
 
-## 1. ESTRUCTURA DE ARCHIVOS (OBLIGATORIA)
+## 1. ESTRUCTURA DE ARCHIVOS (OBLIGATORIA — v4.0 post-unificación)
 
-Generá los archivos dentro de esta estructura exacta. Reemplazá `{nombre}` con un nombre descriptivo en lowercase para tu template (ej: `aurora`, `vertex`, `neon`, `drift`):
+> **IMPORTANTE:** Desde marzo 2026, 5 tipos de secciones están unificadas en componentes con variantes.
+> Ya **NO se generan** componentes para FAQ, Contact, Footer, Services ni ProductCarousel.
+> Solo el **HeroSection** es único por template.
+
+### Paso 0: Scaffold automático
+
+```bash
+node scripts/new-template.mjs <nombre> <número> "<Display Name>"
+# Ejemplo: node scripts/new-template.mjs aurora 9 "Aurora"
+```
+
+Esto genera la estructura base. Solo necesitás **implementar el HeroSection** y **elegir variantes** en `config.js`.
+
+### Estructura generada
 
 ```
 src/templates/{nombre}/
+├── config.js                         ← selección de variantes + metadata
 ├── components/
 │   ├── HeroSection/
-│   │   └── index.jsx
-│   ├── ProductShowcase/          ← nombre libre, mostrá productos
-│   │   └── index.jsx
-│   ├── ServicesSection/          ← nombre libre, mostrá beneficios/servicios
-│   │   └── index.jsx
-│   ├── FAQSection/
-│   │   └── index.jsx
-│   ├── ContactSection/
-│   │   └── index.jsx
-│   ├── Footer{Nombre}/          ← ej: FooterAurora
-│   │   └── index.jsx
-│   └── [componentes extra que quieras]/
-│       └── index.jsx
+│   │   └── index.jsx                 ← ÚNICO componente original (diseño libre)
+│   └── [componentes extra opcionales]/
+│       └── index.jsx                 ← (marquee, testimonials, etc. — solo si son únicos)
 └── pages/
-    └── HomePage{Nombre}/        ← ej: HomePageAurora
-        └── index.jsx            ← ENTRY POINT del template
+    └── HomePage{Nombre}/
+        └── index.jsx                 ← entry point genérico (ya viene pre-generado)
 ```
 
+### Componentes unificados disponibles (NO crear por-template)
+
+| Sección | Variantes | Se elige en |
+|---|---|---|
+| `FAQSection` | `accordion`, `cards`, `masonry` | `config.js` + `variantMap.ts` |
+| `ContactSection` | `cards`, `two-column`, `minimal` | `config.js` + `variantMap.ts` |
+| `Footer` | `columns`, `stacked`, `branded` | `config.js` + `variantMap.ts` |
+| `ServicesSection` | `grid`, `list`, `cards` | `config.js` + `variantMap.ts` |
+| `ProductCarousel` | `basic`, `featured`, `hero` | `config.js` + `variantMap.ts` |
+
 **Reglas de carpetas:**
-- Cada componente en su propia carpeta con `index.jsx`
-- Podés crear tantos componentes extra como quieras (testimonials, brand marquee, countdown, parallax, formulario de contacto, etc.)
+- Solo crear componentes que NO existen como variante unificada
+- El HeroSection es donde va toda la identidad visual del template (layout de banners, animaciones, tipografía hero)
 - El **entry point** es SIEMPRE `pages/HomePage{Nombre}/index.jsx`
+- Componentes extra opcionales: testimonials, brand marquee, countdown, parallax, etc. (solo si el template necesita algo realmente único)
 
 ---
 

@@ -1,9 +1,9 @@
 # Guia: Como Agregar un Nuevo Template y Componentes en NovaVision
 
-> **Ultima actualizacion:** 2026-03-06  
-> **Basado en codigo real** (validado contra `apps/admin`, `apps/api` y `apps/web`)  
-> **Autor:** Revision y actualizacion de arquitectura lazy + preview  
-> **Version:** 3.0
+> **Ultima actualizacion:** 2026-03-19
+> **Basado en codigo real** (validado contra `apps/admin`, `apps/api` y `apps/web`)
+> **Autor:** Revision y actualizacion de arquitectura lazy + preview
+> **Version:** 4.0 — Post-unificación de componentes (T1-T6)
 
 ---
 
@@ -197,7 +197,83 @@ apps/web/src/registry/
 
 ---
 
-## 5. Como agregar un nuevo template Home
+## 5. Proceso post-unificación (nuevo — desde T16)
+
+> **A partir de marzo 2026**, 5 tipos de secciones están unificados en componentes con variantes.
+> Ya **NO se necesita** crear componentes por-template para FAQ, Contact, Footer, Services ni ProductCarousel.
+> Solo el **HeroSection** sigue siendo único por template.
+
+### 5.1 Componentes unificados y variantes disponibles
+
+| Componente | Variantes | Dónde vive |
+|---|---|---|
+| `FAQSection` | `accordion`, `cards`, `masonry` | `src/components/storefront/FAQSection/` |
+| `ContactSection` | `cards`, `two-column`, `minimal` | `src/components/storefront/ContactSection/` |
+| `Footer` | `columns`, `stacked`, `branded` | `src/components/storefront/Footer/` |
+| `ServicesSection` | `grid`, `list`, `cards` | `src/components/storefront/ServicesSection/` |
+| `ProductCarousel` | `basic`, `featured`, `hero` | `src/components/storefront/ProductCarousel/` |
+
+**SectionRenderer** inyecta el prop `variant` automáticamente usando `variantMap.ts`.
+
+### 5.2 Scaffold script
+
+```bash
+node scripts/new-template.mjs <wordKey> <number> [displayName]
+
+# Ejemplo:
+node scripts/new-template.mjs ninth 9 "Urban Edge"
+```
+
+Genera:
+```
+src/templates/ninth/
+├── config.js                         ← variant selections + metadata
+├── components/HeroSection/index.jsx  ← placeholder Hero (ÚNICO componente por-template)
+└── pages/HomePageNinth/index.jsx     ← entry point genérico
+
+src/registry/sectionComponentTemplates/ninth.tsx  ← barrel file con Hero export
+```
+
+Además imprime las instrucciones exactas (copy-paste) para registrar en los 7 archivos del pipeline + SQL seeds.
+
+### 5.3 Archivos de registro (7 puntos de contacto)
+
+| # | Archivo | Qué agregar |
+|---|---------|-------------|
+| 1 | `src/registry/templatesMap.ts` | `lazy(() => import(...))` + entry en `TEMPLATES` |
+| 2 | `src/theme/resolveEffectiveTheme.ts` | `template_N: 'wordKey'` en `canonicalMap` |
+| 3 | `src/templates/manifest.js` | Metadata del template (nombre, features, status) |
+| 4 | `src/registry/variantMap.ts` | 5 entries (una por tipo de componente unificado) |
+| 5 | `src/registry/sectionComponents.tsx` | Hero entry + 5 unified component entries |
+| 6 | `src/registry/sectionComponentTemplates/{name}.tsx` | Barrel con Hero export |
+| 7 | `previewPresetSections.js` | Alias + preset de secciones por defecto |
+
+### 5.4 Flujo resumido
+
+1. Ejecutar `node scripts/new-template.mjs`
+2. Diseñar e implementar el HeroSection (el único componente original)
+3. Elegir variantes para cada sección unificada (ver tabla 5.1)
+4. Agregar las entradas en los 7 archivos (el script imprime los snippets)
+5. Agregar SQL seeds en la BD (nv_templates + palette_catalog)
+6. Registrar `componentKey` nuevos en `apps/api/src/home/registry/sections.ts`
+7. Validar: `npm run typecheck && npm run build && npx vitest run`
+
+### 5.5 Lo que NO se necesita hacer
+
+- ~~Crear componente FAQ por-template~~ → usa variante unificada
+- ~~Crear componente Contact por-template~~ → usa variante unificada
+- ~~Crear componente Footer por-template~~ → usa variante unificada
+- ~~Crear componente Services por-template~~ → usa variante unificada
+- ~~Crear componente ProductCarousel/Showcase por-template~~ → usa variante unificada
+- ~~Escribir 8+ archivos de componentes~~ → solo HeroSection + config.js
+
+---
+
+## 6. Proceso legacy: cómo agregar un template Home (pre-unificación)
+
+> **Nota:** Este proceso aplica si necesitás crear componentes completamente custom
+> que no encajan en ninguna variante unificada. Para templates nuevos, usar el
+> proceso de la sección 5.
 
 ### Paso 1: crear la carpeta del template
 
@@ -317,7 +393,7 @@ Revisar, segun aplique:
 
 ---
 
-## 6. Como agregar componentes para secciones dinamicas
+## 7. Como agregar componentes para secciones dinamicas
 
 Si el builder va a emitir `componentKey` nuevos, hay que registrar toda la cadena runtime.
 
@@ -571,7 +647,7 @@ function Services({ servicesList = [] }) {
 
 ---
 
-## 6. Schema de datos: qué viene de la API
+## 8. Schema de datos: qué viene de la API
 
 ### Producto completo
 
@@ -688,7 +764,7 @@ interface SocialLinks {
 
 ---
 
-## 7. Sistema de temas: variables CSS disponibles
+## 9. Sistema de temas: variables CSS disponibles
 
 ### Contrato canónico (28 tokens — producidos por API)
 
@@ -750,7 +826,7 @@ El Admin puede configurar `paletteKey` (paleta predefinida) O `themeConfig` (ove
 
 ---
 
-## 8. Compatibilidad con el onboarding
+## 10. Compatibilidad con el onboarding
 
 Los templates también se muestran durante el onboarding (preview del template que el cliente está eligiendo). Para que funcione correctamente:
 
@@ -774,7 +850,7 @@ El onboarding usa el mismo `HomeRouter` con un `homeData` mínimo que tiene solo
 
 ---
 
-## 9. Componentes compartidos entre templates
+## 11. Componentes compartidos entre templates
 
 Algunos componentes están en `src/components/` (global) y pueden usarse desde cualquier template:
 
@@ -793,7 +869,7 @@ Algunos componentes están en `src/components/` (global) y pueden usarse desde c
 
 ---
 
-## 10. Checklist de validación antes de hacer PR
+## 12. Checklist de validación antes de hacer PR
 
 ### Template (registro en el sistema)
 
@@ -832,7 +908,7 @@ Algunos componentes están en `src/components/` (global) y pueden usarse desde c
 
 ---
 
-## 11. Archivos de referencia clave
+## 13. Archivos de referencia clave
 
 | Archivo                                                                                                                                                                   | Propósito                               |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
