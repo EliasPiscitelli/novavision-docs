@@ -48,6 +48,14 @@ Las imágenes generadas por IA (banners, fotos de producto, logos) ahora respeta
 
 - Mock de `getBrandColors` agregado al mock de `StoreContextService`
 
+### Art Direction Expansion (`prompts/index.ts`)
+
+- **Nueva función** `expandWithArtDirection(text, mode)`: detecta keywords de rubro en el prompt del usuario y enriquece automáticamente con vocabulario de dirección artística específico
+- **10 categorías cubiertas**: moda/ropa, farmacia/salud, gastronomía, tech/electrónica, hogar/deco, bebé/infantil, deportes/fitness, belleza/cosmética, mascotas, ofertas/promos
+- **Modo dual**: cada categoría tiene expansión diferenciada para banners (composición editorial) y fotos de producto (técnica fotográfica)
+- **Ejemplo**: `"Oferta en remeras femeninas 40% off"` → se expande con `"Editorial fashion photography aesthetic, confident model in aspirational lifestyle setting..."` + `"High-energy promotional visual with urgency..."`
+- **Graceful**: si el prompt no matchea ninguna categoría, pasa sin modificar
+
 ## Fallback
 
 - Tiendas sin paleta configurada → `brandColors = null` → prompts funcionan exactamente como antes
