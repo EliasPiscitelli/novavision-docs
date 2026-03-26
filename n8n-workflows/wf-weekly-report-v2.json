@@ -110,10 +110,10 @@
     },
     {
       "parameters": {
-        "jsCode": "const funnel = $input.all()[0]?.json || {};\nconst activity = $input.all()[1]?.json || {};\nconst msgs = $input.all()[2]?.json || {};\nconst kpis = $input.all()[3]?.json || {};\n\nconst today = new Date().toLocaleDateString('es-AR', {dateStyle:'long'});\n\nconst report = `📊 *REPORTE SEMANAL OUTREACH – ${today}*\n\n🔢 *FUNNEL ACTUAL*\n├ 🆕 NEW: ${funnel.funnel_new || 0}\n├ 📞 CONTACTED: ${funnel.funnel_contacted || 0}\n├ 💬 IN_CONVERSATION: ${funnel.funnel_in_conv || 0}\n├ ⭐ QUALIFIED: ${funnel.funnel_qualified || 0}\n├ 🏗️ ONBOARDING: ${funnel.funnel_onboarding || 0}\n├ 🏆 WON: ${funnel.funnel_won || 0}\n├ 🥶 COLD: ${funnel.funnel_cold || 0}\n├ ❌ LOST: ${funnel.funnel_lost || 0}\n└ 🗑️ DISCARDED: ${funnel.funnel_discarded || 0}\n\n📈 *ACTIVIDAD ESTA SEMANA*\n├ Contactados: ${activity.contacted_this_week || 0}\n├ Conversaciones: ${activity.conversations_this_week || 0}\n├ Calificados: ${activity.qualified_this_week || 0}\n├ En Onboarding: ${activity.onboarding_this_week || 0}\n├ Ganados: ${activity.won_this_week || 0}\n├ Perdidos: ${activity.lost_this_week || 0}\n└ Hot Leads activos: ${activity.hot_leads_active || 0}\n\n📨 *MENSAJERIA (7d)*\n├ Enviados: ${msgs.msgs_sent_week || 0}\n├ Recibidos: ${msgs.msgs_received_week || 0}\n├ Respondedores únicos: ${msgs.unique_responders || 0}\n└ Errores: ${msgs.errors_week || 0}\n\n🎯 *KPIs*\n├ Conversion Rate: ${kpis.conversion_rate || 0}%\n├ Engagement Rate: ${kpis.engagement_rate || 0}%\n├ Avg AI Score: ${kpis.avg_ai_score || 'N/A'}\n└ Avg Follow-ups to Win: ${kpis.avg_followups_to_win || 'N/A'}`;\n\nreturn [{ json: { report, ...funnel, ...activity, ...msgs, ...kpis } }];"
+        "jsCode": "const funnel = $input.all()[0]?.json || {};\nconst activity = $input.all()[1]?.json || {};\nconst msgs = $input.all()[2]?.json || {};\nconst kpis = $input.all()[3]?.json || {};\nconst hotLeads = $input.all()[4]?.json ? $input.all().slice(4).map(i => i.json) : [];\n\n// ── Validación de datos ──\nconst safeNum = (v) => {\n  const n = Number(v);\n  return (isNaN(n) || v === null || v === undefined) ? 0 : n;\n};\nconst safePct = (v) => {\n  const n = Number(v);\n  return (isNaN(n) || v === null || v === undefined) ? '0.0' : n.toFixed(1);\n};\n\nconst today = new Date().toLocaleDateString('es-AR', {dateStyle:'long'});\nconst weekAgo = new Date(Date.now() - 7*24*60*60*1000).toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit'});\nconst todayShort = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit'});\n\n// ── Hot leads formatting ──\nlet hotLeadsSection = '';\nif (hotLeads.length > 0) {\n  hotLeadsSection = hotLeads.map((l, i) =>\n    `${i+1}. ${l.name || 'Sin nombre'} | Score: ${safeNum(l.ai_engagement_score)} | ${l.status}`\n  ).join('\\n');\n} else {\n  hotLeadsSection = 'Sin hot leads activos esta semana';\n}\n\nconst report = `📊 *REPORTE SEMANAL OUTREACH*\\n📅 Semana ${weekAgo} al ${todayShort} — ${today}\\n\\n━━━━━━━━━━━━━━━━━━\\n🔢 *FUNNEL ACTUAL*\\n━━━━━━━━━━━━━━━━━━\\n├ 🆕 NEW: ${safeNum(funnel.funnel_new)}\\n├ 📞 CONTACTED: ${safeNum(funnel.funnel_contacted)}\\n├ 💬 IN_CONVERSATION: ${safeNum(funnel.funnel_in_conv)}\\n├ ⭐ QUALIFIED: ${safeNum(funnel.funnel_qualified)}\\n├ 🏗️ ONBOARDING: ${safeNum(funnel.funnel_onboarding)}\\n├ 🏆 WON: ${safeNum(funnel.funnel_won)}\\n├ 🥶 COLD: ${safeNum(funnel.funnel_cold)}\\n├ ❌ LOST: ${safeNum(funnel.funnel_lost)}\\n└ 🗑️ DISCARDED: ${safeNum(funnel.funnel_discarded)}\\n📊 Total: ${safeNum(funnel.total)}\\n\\n━━━━━━━━━━━━━━━━━━\\n📈 *ACTIVIDAD ESTA SEMANA*\\n━━━━━━━━━━━━━━━━━━\\n├ Contactados: ${safeNum(activity.contacted_this_week)}\\n├ Conversaciones: ${safeNum(activity.conversations_this_week)}\\n├ Calificados: ${safeNum(activity.qualified_this_week)}\\n├ En Onboarding: ${safeNum(activity.onboarding_this_week)}\\n├ Ganados: ${safeNum(activity.won_this_week)}\\n├ Perdidos: ${safeNum(activity.lost_this_week)}\\n└ 🔥 Hot Leads activos: ${safeNum(activity.hot_leads_active)}\\n\\n━━━━━━━━━━━━━━━━━━\\n📨 *MENSAJERÍA (7d)*\\n━━━━━━━━━━━━━━━━━━\\n├ Enviados: ${safeNum(msgs.msgs_sent_week)}\\n├ Recibidos: ${safeNum(msgs.msgs_received_week)}\\n├ Respondedores únicos: ${safeNum(msgs.unique_responders)}\\n└ ⚠️ Errores: ${safeNum(msgs.errors_week)}\\n\\n━━━━━━━━━━━━━━━━━━\\n🎯 *KPIs*\\n━━━━━━━━━━━━━━━━━━\\n├ Conversión: ${safePct(kpis.conversion_rate)}%\\n├ Engagement: ${safePct(kpis.engagement_rate)}%\\n├ Avg AI Score: ${kpis.avg_ai_score || 'N/A'}\\n└ Avg Follow-ups to Win: ${kpis.avg_followups_to_win || 'N/A'}\\n\\n━━━━━━━━━━━━━━━━━━\\n🔥 *TOP HOT LEADS*\\n━━━━━━━━━━━━━━━━━━\\n${hotLeadsSection}`;\n\n// Validar que el reporte no está vacío\nif (!report || report.length < 100) {\n  throw new Error('Reporte generado vacío o incompleto');\n}\n\nreturn [{ json: { report, validated: true, charCount: report.length } }];"
       },
       "id": "report-format",
-      "name": "Formatear Reporte",
+      "name": "Formatear y Validar Reporte",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [720, 200]
@@ -141,6 +141,30 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [940, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $env.SALES_ALERT_PHONE }}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"⚠️ *ERROR - Reporte Semanal*\\n\\nEl reporte semanal de outreach no se pudo generar.\\nError: {{ $json.error?.message || 'Error desconocido' }}\\n\\nRevisar n8n para más detalles.\" }\n}",
+        "options": {}
+      },
+      "id": "report-fallback",
+      "name": "Fallback - Avisar Error",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 450]
     }
   ],
   "connections": {
@@ -177,30 +201,36 @@
     },
     "Top Hot Leads": {
       "main": [
-        [{ "node": "Formatear Reporte", "type": "main", "index": 0 }]
+        [{ "node": "Formatear y Validar Reporte", "type": "main", "index": 0 }]
       ]
     },
     "Merge All Data": {
       "main": [
-        [{ "node": "Formatear Reporte", "type": "main", "index": 0 }]
+        [{ "node": "Formatear y Validar Reporte", "type": "main", "index": 0 }]
       ]
     },
-    "Formatear Reporte": {
+    "Formatear y Validar Reporte": {
       "main": [
         [{ "node": "Enviar por WhatsApp", "type": "main", "index": 0 }]
       ]
     }
   },
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "errorWorkflow": "",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
   },
+  "staticData": null,
+  "pinData": {},
   "meta": {
-    "description": "Cron Lunes 9:00 ART. Genera reporte semanal con: funnel snapshot, actividad 7d, métricas de mensajería, KPIs de conversión, top hot leads. Envía por WhatsApp al número de alertas.",
+    "description": "Cron Lunes 9:00 ART. Genera reporte semanal con: funnel snapshot, actividad 7d, métricas de mensajería, KPIs de conversión, top hot leads. Envía por WhatsApp al número de alertas. Incluye validación de datos (safeNum/safePct) y fallback de error.",
     "templateCredsSetupCompleted": true
   },
   "tags": [
     { "name": "outreach" },
     { "name": "report" },
-    { "name": "v2" }
+    { "name": "v2" },
+    { "name": "production-ready" }
   ]
 }
