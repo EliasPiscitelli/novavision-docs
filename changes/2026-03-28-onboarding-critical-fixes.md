@@ -15,8 +15,9 @@ Se resolvieron los 8 issues detectados durante testing real del onboarding en pr
 
 **Fix:** Migración SQL ejecutada en Admin DB:
 ```sql
-ALTER TABLE nv_onboarding ADD COLUMN selected_font_key text;
+ALTER TABLE nv_onboarding ADD COLUMN IF NOT EXISTS selected_font_key text;
 ```
+**Migración formal:** `apps/api/migrations/admin/ADMIN_037_add_selected_font_key.sql`
 **Verificación:** Confirmada con query a `information_schema.columns`.
 **Impacto:** Desbloquea todo el Step 4 — eliminados los 500 en `PATCH /onboarding/preferences`.
 
@@ -67,5 +68,12 @@ ALTER TABLE nv_onboarding ADD COLUMN selected_font_key text;
 ## Validación
 
 - Admin: lint ✓, typecheck ✓, build ✓, tests ✓ (148/148 pass)
+- API: lint ✓, typecheck ✓, build ✓ (pre-push hook)
 - SQL: Columna `selected_font_key` verificada en BD real
 - Catálogo: 0 items `enterprise` en `sectionCatalog.ts`, alineado con `component_catalog` de BD
+
+## Commits
+
+- **Admin** (`feature/automatic-multiclient-onboarding`): `fa2444c` — 8 fixes frontend
+- **API** (`feature/automatic-multiclient-onboarding`): `98570d9` — migración ADMIN_037
+- **Docs** (`main`): changelog
