@@ -1,0 +1,264 @@
+{
+  "name": "WF-RETENTION-V1 — Retención Post-Cancel",
+  "id": "retention_v1_001",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "retention-trigger",
+      "name": "Cron Diario 09:00 UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  a.id AS account_id,\n  a.email,\n  a.store_name,\n  a.slug,\n  a.plan_key,\n  a.country,\n  a.subscription_status,\n  le.created_at AS cancelled_at,\n  le.new_value->>'reason' AS cancellation_reason,\n  EXTRACT(DAY FROM NOW() - le.created_at)::int AS days_since_cancel\nFROM nv_accounts a\nJOIN lifecycle_events le ON le.account_id = a.id\n  AND le.event_type = 'subscription_cancel_requested'\nWHERE a.subscription_status IN ('canceled', 'suspended')\n  AND le.created_at >= NOW() - INTERVAL '30 days'\n  AND a.id NOT IN (\n    SELECT DISTINCT (event_data->>'account_id')::uuid\n    FROM crm_activity_log\n    WHERE event_type = 'retention_email_sent'\n      AND created_at >= le.created_at\n  )\nORDER BY le.created_at ASC\nLIMIT 20",
+        "options": {}
+      },
+      "id": "retention-fetch",
+      "name": "Fetch Churned Accounts",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [240, 300],
+      "credentials": {
+        "postgres": { "id": "dMEly2JOB3W86tWW", "name": "Admin DB" }
+      },
+      "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "has-results",
+              "leftValue": "={{ $json.length || $input.all().length }}",
+              "rightValue": "0",
+              "operator": { "type": "number", "operation": "notEquals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "retention-check-empty",
+      "name": "¿Hay cuentas?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "retention-loop",
+      "name": "Loop Accounts",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [720, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst days = item.days_since_cancel || 0;\n\nlet template = 'day1_empathy';\nlet coupon_code = null;\nlet suggested_coupon = null;\n\nif (days <= 1) {\n  template = 'day1_empathy';\n} else if (days >= 2 && days <= 4) {\n  template = 'day3_value';\n} else if (days >= 5 && days <= 10) {\n  template = 'day7_winback';\n  coupon_code = 'COMEBACK30';\n  suggested_coupon = '30% off';\n} else if (days >= 11 && days <= 17) {\n  template = 'day7_winback';\n  coupon_code = 'COMEBACK50';\n  suggested_coupon = '50% off';\n} else if (days >= 18) {\n  template = 'day14_final';\n  coupon_code = 'FREERETURN';\n  suggested_coupon = 'Primer mes gratis';\n}\n\nreturn [{\n  json: {\n    ...item,\n    template,\n    coupon_code,\n    suggested_coupon,\n    days_since_cancel: days\n  }\n}];"
+      },
+      "id": "retention-classify",
+      "name": "Clasificar Etapa",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst crypto = require('crypto');\nconst secret = $env.N8N_INTERNAL_SECRET;\nconst apiUrl = $env.API_URL || 'https://novavision-production.up.railway.app';\n\nconst path = '/internal/retention/email/send';\nconst method = 'POST';\nconst timestamp = Date.now().toString();\nconst correlationId = crypto.randomUUID();\n\nconst body = JSON.stringify({\n  account_id: item.account_id,\n  template: item.template,\n  coupon_code: item.coupon_code || undefined\n});\n\nconst bodyHash = crypto.createHash('sha256').update(body).digest('hex');\nconst payload = `${timestamp}\\n${method}\\n${path}\\n${bodyHash}`;\nconst signature = 'sha256=' + crypto.createHmac('sha256', secret).update(payload).digest('hex');\n\nreturn [{\n  json: {\n    ...item,\n    _api_url: `${apiUrl}${path}`,\n    _body: body,\n    _timestamp: timestamp,\n    _signature: signature,\n    _correlation_id: correlationId\n  }\n}];"
+      },
+      "id": "retention-sign-request",
+      "name": "HMAC Sign Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json._api_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-NV-Timestamp", "value": "={{ $json._timestamp }}" },
+            { "name": "X-NV-Signature", "value": "={{ $json._signature }}" },
+            { "name": "X-Correlation-Id", "value": "={{ $json._correlation_id }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ $json._body }}",
+        "options": {
+          "timeout": 15000,
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "retention-send-email",
+      "name": "API: Send Retention Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1440, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst success = item.statusCode === 200 || item.statusCode === 201 || item.ok === true;\nconst emoji = success ? '✅' : '❌';\n\nconsole.log(`${emoji} Retention email: account=${item.account_id} template=${item.template} coupon=${item.coupon_code || 'none'} status=${success ? 'sent' : 'failed'}`);\n\nreturn [{ json: { ...item, email_sent: success } }];"
+      },
+      "id": "retention-log-result",
+      "name": "Log Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 200]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO crm_activity_log (account_id, actor_type, actor_id, event_type, event_data)\nVALUES (\n  '{{ $json.account_id }}'::uuid,\n  'n8n',\n  NULL,\n  'retention_email_sent',\n  jsonb_build_object(\n    'template', '{{ $json.template }}',\n    'coupon_code', '{{ $json.coupon_code || \"\" }}',\n    'days_since_cancel', {{ $json.days_since_cancel || 0 }},\n    'email_sent', {{ $json.email_sent || false }},\n    'correlation_id', '{{ $json._correlation_id || \"\" }}'\n  )\n);",
+        "options": {}
+      },
+      "id": "retention-log-crm",
+      "name": "Log CRM Activity",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [1920, 200],
+      "credentials": {
+        "postgres": { "id": "dMEly2JOB3W86tWW", "name": "Admin DB" }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $env.SALES_ALERT_PHONE }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": {{ JSON.stringify(\n      `📩 Retention — ${$json.template}\\n` +\n      `Cuenta: ${$json.email} (${$json.slug})\\n` +\n      `Plan: ${$json.plan_key}\\n` +\n      `Días desde cancel: ${$json.days_since_cancel}\\n` +\n      `Cupón: ${$json.coupon_code || 'ninguno'}\\n` +\n      `Status: ${$json.email_sent ? '✅ enviado' : '❌ falló'}`\n    ) }}\n  }\n}",
+        "options": {}
+      },
+      "id": "retention-wa-notify",
+      "name": "WA: Notificar Equipo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1920, 420],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {},
+      "id": "retention-noop-empty",
+      "name": "NoOp (sin cuentas)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [720, 420]
+    },
+    {
+      "parameters": {},
+      "id": "retention-noop-end",
+      "name": "NoOp (fin)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2160, 300]
+    }
+  ],
+  "connections": {
+    "Cron Diario 09:00 UTC": {
+      "main": [
+        [{ "node": "Fetch Churned Accounts", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Churned Accounts": {
+      "main": [
+        [{ "node": "¿Hay cuentas?", "type": "main", "index": 0 }]
+      ]
+    },
+    "¿Hay cuentas?": {
+      "main": [
+        [{ "node": "Loop Accounts", "type": "main", "index": 0 }],
+        [{ "node": "NoOp (sin cuentas)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Loop Accounts": {
+      "main": [
+        [{ "node": "NoOp (fin)", "type": "main", "index": 0 }],
+        [{ "node": "Clasificar Etapa", "type": "main", "index": 0 }]
+      ]
+    },
+    "Clasificar Etapa": {
+      "main": [
+        [{ "node": "HMAC Sign Request", "type": "main", "index": 0 }]
+      ]
+    },
+    "HMAC Sign Request": {
+      "main": [
+        [{ "node": "API: Send Retention Email", "type": "main", "index": 0 }]
+      ]
+    },
+    "API: Send Retention Email": {
+      "main": [
+        [{ "node": "Log Result", "type": "main", "index": 0 }]
+      ]
+    },
+    "Log Result": {
+      "main": [
+        [
+          { "node": "Log CRM Activity", "type": "main", "index": 0 },
+          { "node": "WA: Notificar Equipo", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Log CRM Activity": {
+      "main": [
+        [{ "node": "Loop Accounts", "type": "main", "index": 0 }]
+      ]
+    },
+    "WA: Notificar Equipo": {
+      "main": [
+        [{ "node": "Loop Accounts", "type": "main", "index": 0 }]
+      ]
+    },
+    "NoOp (sin cuentas)": {
+      "main": [
+        [{ "node": "NoOp (fin)", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "retention" },
+    { "name": "churn" },
+    { "name": "production" }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": ""
+  },
+  "pinData": {},
+  "versionId": "retention-v1-001"
+}

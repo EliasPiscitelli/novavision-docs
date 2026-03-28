@@ -77,19 +77,21 @@ Unificacion del sistema de imagenes.
 
 ---
 
-## Planes activos referenciados
+## Planes activos referenciados (validado contra planes reales)
 
-| Plan | Estado | Progreso estimado |
-|------|--------|-------------------|
-| `PLAN_CHURN_LIFECYCLE` | En ejecucion | Fase 1-2 completas, Fase 3 (reactivacion) completa |
-| `PLAN_TEMPLATE_COMPONENT_UNIFICATION` | Completado | T1-T16 + wiring + hardening |
-| `PLAN_CRM_INTERNAL_SUPERADMIN` | Phase 1 completo | Backend + DB + UI base |
-| `PLAN_SUPPORT_TICKETS_AI_PIPELINE` | En ejecucion | AI analysis + pipeline + intake funcional |
-| `PLAN_AI_PRODUCT_FULL_GENERATION` | Sprints 1-5 completos | PlanLimitsGuard, Anthropic provider, cost tracking |
-| `PLAN_UNIFIED_MEDIA_REGISTRATION` | Completado | Registration + migration + auto-save |
-| `PLAN_STORE_DESIGN_PARITY_AND_UNIFICATION` | Completado | Fases A-B-C + hardening |
-| `PLAN_DYNAMIC_FOOTER_GENERATION` | Fase 1 completa | Backend + DB, falta frontend |
-| `PLAN_ONBOARDING_DINAMICO_MULTILATAM` | En ejecucion | Admin CRUD completado |
+| Plan | Estado | Detalle |
+|------|--------|---------|
+| `PLAN_TEMPLATE_COMPONENT_UNIFICATION` | **Completado** | T0-T6 + wiring + hardening + deployment. 8/8 sub-fases. |
+| `PLAN_SUPPORT_TICKETS_AI_PIPELINE` | **Completado** | 4/4 fases: migracion SQL, backend, admin frontend, web storefront. |
+| `PLAN_UNIFIED_MEDIA_REGISTRATION` | **Completado** | 4/4 fases: migraciones, helpers, integracion en productos, backwards compat. |
+| `PLAN_CRM_INTERNAL_SUPERADMIN` | En ejecucion | F1 completa + F2 parcial (health cron + alertas n8n). Faltan: automatizaciones core, tareas overdue, vistas especializadas, RBAC (F2-F3). |
+| `PLAN_CHURN_LIFECYCLE` | En ejecucion | 6/17 items. Hecho: cancel_log, grace dinamico, reactivacion, pausa, downgrade, lifecycle churned. Faltan: exit survey, dashboard churn, win-back emails, pre-churn deteccion, archivado frio, analytics (11 items). |
+| `PLAN_STORE_DESIGN_PARITY_AND_UNIFICATION` | Avanzado | Trabajo extenso (12 changelogs): variant registry, draft/apply, grouped props, public parity. Pendiente confirmar: persistencia componentKey en API, normalizacion plan keys, tipos compartidos cross-app. |
+| `PLAN_DYNAMIC_FOOTER_GENERATION` | En ejecucion | 1/3 fases. Hecho: backend + DB + endpoints. Faltan: F2 Admin UI (FooterConfigSection), F3 Storefront (SectionRenderer + FooterParts dinamicos). |
+| `PLAN_ONBOARDING_DINAMICO_MULTILATAM` | En ejecucion | Fase A completa + Fase B parcial (1.5 de 5 fases). Faltan: B parcial (business-info refactor), C (frontend dinamico), D (suscripciones multi-pais), E (captcha + rate limiting). |
+| `PLAN_AI_PRODUCT_FULL_GENERATION` | Apenas iniciado | Solo Bloque 3A (migracion imagenes). Faltan: B1 (ai-fill full product), B2 (ProductModal AI), B4 (ServiceSection/Logo/Banners AI), B5 (Tours IA), B6 (Pricing UI). |
+
+**Nota**: Los changelogs Sprint AI Pro (M1-M11) corresponden a un plan separado no listado aqui. Ese plan tiene 8/12 milestones completados.
 
 ---
 
@@ -102,10 +104,18 @@ Unificacion del sistema de imagenes.
 
 ---
 
-## Proximos pasos sugeridos
+## Pendientes concretos por prioridad
 
-1. **Churn Lifecycle Fase 3**: Emails automaticos de win-back, dashboard de metricas de churn.
-2. **CRM Phase 2**: Automatizaciones, scoring de leads, integracion con Marketing OS.
-3. **Support AI**: Respuestas automaticas para tickets comunes.
-4. **Dynamic Footer**: Frontend para configuracion de footer personalizado.
-5. **Multi-LATAM**: Expansion a nuevos paises con fiscal config completa.
+### Alta prioridad (bloqueantes de negocio)
+1. **Onboarding Multi-LATAM Fases C-E**: Frontend dinamico, suscripciones multi-pais, captcha. Bloquea expansion a nuevos paises.
+2. **Churn Lifecycle — Exit survey + Win-back emails**: Items de retencion directa de clientes (11 items pendientes).
+3. **AI Product Full Generation — Bloques 1-2**: ai-fill full product + ProductModal AI. Core de la propuesta de valor IA.
+
+### Media prioridad (mejoras operativas)
+4. **CRM Fases 2-3**: Automatizaciones, tareas overdue, RBAC, dashboard KPIs.
+5. **Dynamic Footer Fases 2-3**: Admin UI + storefront. Feature visible para tenants.
+6. **Store Design**: Validar persistencia componentKey y normalizacion plan keys.
+
+### Baja prioridad (optimizacion)
+7. **Churn Lifecycle items 4.x**: Archivado frio, money-back, free tier, analytics dashboard.
+8. **AI Pro milestones restantes**: M5 (AI Onboarding Coach), M6 (Discoverability), M10 (n8n reporting), M12 (AI Closer).
